@@ -1,0 +1,122 @@
+id: transcript-fetcher
+namespace: company.team
+description: |
+  Fetches the transcript/captions from a YouTube video.
+  Uses youtube-transcript-api to extract captions.
+
+labels:
+  project: faceless-video-generator
+  type: subflow
+
+inputs:
+  - id: video_url
+    type: STRING
+    description: YouTube video URL
+
+outputs:
+  - id: transcript
+    type: STRING
+    value: "{{ outputs.extract_transcript.vars.transcript }}"
+  - id: summary
+    type: STRING
+    value: "{{ outputs.generate_summary.vars.summary }}"
+
+tasks:
+  - id: extract_video_id
+    type: io.kestra.plugin.scripts.python.Script
+    script: |
+      import re
+      
+      video_url = "{{ inputs.video_url }}"
+      
+      patterns = [
+          r'(?:v=|/v/|youtu\.be/|/embed/)([a-zA-Z0-9_-]{11})',
+          r'^([a-zA-Z0-9_-]{11})$'
+      ]
+      
+      video_id = None
+      for pattern in patterns:
+          match = re.search(pattern, video_url)
+          if match:
+              video_id = match.group(1)
+              break
+      
+      if not video_id:
+          raise Exception("Could not extract video ID from: " + video_url)
+      
+      print("::output video_id::" + video_id)
+
+  - id: extract_transcript
+    type: io.kestra.plugin.scripts.python.Script
+    beforeCommands:
+      - pip install youtube-transcript-api > /dev/null 2>&1
+    script: |
+      from youtube_transcript_api import YouTubeTranscriptApi
+      from youtube_transcript_api._errors import TranscriptsDisabled, NoTranscriptFound
+      import json
+      import base64
+      
+      video_id = "{{ outputs.extract_video_id.vars.video_id }}"
+      
+      try:
+          transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+          
+          transcript = None
+          
+          try:
+              for t in transcript_list:
+                  if not t.is_generated:
+                      transcript = t.fetch()
+                      print("Found manual transcript in: " + t.language)
+                      break
+          except:
+              pass
+          
+          if not transcript:
+              for t in transcript_list:
+                  if t.is_generated:
+                      transcript = t.fetch()
+                      print("Found auto-generated transcript in: " + t.language)
+                      break
+          
+          if not transcript:
+              transcript = YouTubeTranscriptApi.get_transcript(video_id)
+          
+          full_text = ' '.join([segment['text'] for segment in transcript])
+          full_text = full_text.replace('\n', ' ').replace('  ', ' ').strip()
+          
+          print("Transcript length: " + str(len(full_text)) + " characters")
+          
+          encoded = base64.b64encode(full_text.encode()).decode()
+          print("::output transcript_b64::" + encoded)
+          print("::output transcript::" + full_text[:50000])
+          
+      except TranscriptsDisabled:
+          raise Exception("Transcripts are disabled for this video")
+      except NoTranscriptFound:
+          raise Exception("No transcript found for this video")
+      except Exception as e:
+          raise Exception("Error fetching transcript: " + str(e))
+
+  - id: generate_summary
+    type: io.kestra.plugin.scripts.python.Script
+    beforeCommands:
+      - pip install google-generativeai > /dev/null 2>&1
+    env:
+      GOOGLE_API_KEY: "{{ kv('GOOGLE_API_KEY') }}"
+    script: |
+      import google.generativeai as genai
+      import os
+      
+      genai.configure(api_key=os.environ['GOOGLE_API_KEY'])
+      model = genai.GenerativeModel('gemini-2.0-flash')
+      
+      transcript = """{{ outputs.extract_transcript.vars.transcript }}"""
+      
+      prompt = "Based on the following video transcript, provide a brief summary (2-3 sentences) that captures the main story or content. This will be used to generate a project name.\n\nTranscript:\n" + transcript[:5000] + "\n\nSummary:"
+      
+      response = model.generate_content(prompt)
+      summary = response.text.strip()
+      
+      print("Summary: " + summary)
+      print("::output summary::" + summary)

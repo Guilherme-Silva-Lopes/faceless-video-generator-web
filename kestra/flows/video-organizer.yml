@@ -1,0 +1,169 @@
+id: video-organizer
+namespace: company.team
+description: |
+  Main orchestrator workflow that coordinates the entire video generation pipeline.
+  Receives a project_id and executes all sub-workflows in sequence.
+
+labels:
+  project: faceless-video-generator
+  type: orchestrator
+
+inputs:
+  - id: project_id
+    type: STRING
+    description: UUID of the project to process
+
+tasks:
+  - id: get_project
+    type: io.kestra.plugin.core.http.Request
+    uri: "{{ kv('SUPABASE_URL') }}/rest/v1/projects?id=eq.{{ inputs.project_id }}&select=*,channels(*)"
+    method: GET
+    headers:
+      apikey: "{{ kv('SUPABASE_ANON_KEY') }}"
+      Authorization: "Bearer {{ kv('SUPABASE_ANON_KEY') }}"
+
+  - id: parse_project
+    type: io.kestra.plugin.scripts.python.Script
+    inputFiles:
+      project.json: "{{ outputs.get_project.body }}"
+    script: |
+      import json
+      
+      with open('project.json', 'r') as f:
+          projects = json.load(f)
+      
+      if not projects:
+          raise Exception("Project not found")
+      
+      project = projects[0]
+      
+      output = {
+          'id': project['id'],
+          'source_video_url': project['source_video_url'],
+          'project_name': project['project_name'],
+          'project_slug': project['project_slug'],
+          'language': project['language'],
+          'storage_folder': project['storage_folder'],
+          'channel': project.get('channels', {})
+      }
+      
+      with open('project_data.json', 'w') as f:
+          json.dump(output, f, indent=2)
+      
+      print("Processing project: " + output['project_name'])
+      print("Language: " + output['language'])
+      print("Source: " + output['source_video_url'])
+    outputFiles:
+      - project_data.json
+
+  - id: update_status_processing
+    type: io.kestra.plugin.core.http.Request
+    uri: "{{ kv('SUPABASE_URL') }}/rest/v1/projects?id=eq.{{ inputs.project_id }}"
+    method: PATCH
+    headers:
+      apikey: "{{ kv('SUPABASE_ANON_KEY') }}"
+      Authorization: "Bearer {{ kv('SUPABASE_ANON_KEY') }}"
+      Content-Type: application/json
+    body: '{"status": "processing"}'
+
+  - id: get_transcript
+    type: io.kestra.plugin.core.flow.Subflow
+    namespace: company.team
+    flowId: transcript-fetcher
+    inputs:
+      video_url: "{{ json(read(outputs.parse_project.outputFiles['project_data.json'])).source_video_url }}"
+    wait: true
+
+  - id: generate_script
+    type: io.kestra.plugin.core.flow.Subflow
+    namespace: company.team
+    flowId: script-generator
+    inputs:
+      project_id: "{{ inputs.project_id }}"
+      transcript: "{{ outputs.get_transcript.outputs.transcript }}"
+      language: "{{ json(read(outputs.parse_project.outputFiles['project_data.json'])).language }}"
+    wait: true
+
+  - id: update_status_script_done
+    type: io.kestra.plugin.core.http.Request
+    uri: "{{ kv('SUPABASE_URL') }}/rest/v1/projects?id=eq.{{ inputs.project_id }}"
+    method: PATCH
+    headers:
+      apikey: "{{ kv('SUPABASE_ANON_KEY') }}"
+      Authorization: "Bearer {{ kv('SUPABASE_ANON_KEY') }}"
+      Content-Type: application/json
+    body: '{"status": "script_done", "script": {{ outputs.generate_script.outputs.script | json }}}'
+
+  - id: generate_packaging
+    type: io.kestra.plugin.core.flow.Subflow
+    namespace: company.team
+    flowId: packaging-generator
+    inputs:
+      project_id: "{{ inputs.project_id }}"
+      source_video_url: "{{ json(read(outputs.parse_project.outputFiles['project_data.json'])).source_video_url }}"
+      script: "{{ outputs.generate_script.outputs.script }}"
+      language: "{{ json(read(outputs.parse_project.outputFiles['project_data.json'])).language }}"
+    wait: true
+
+  - id: update_status_packaging_done
+    type: io.kestra.plugin.core.http.Request
+    uri: "{{ kv('SUPABASE_URL') }}/rest/v1/projects?id=eq.{{ inputs.project_id }}"
+    method: PATCH
+    headers:
+      apikey: "{{ kv('SUPABASE_ANON_KEY') }}"
+      Authorization: "Bearer {{ kv('SUPABASE_ANON_KEY') }}"
+      Content-Type: application/json
+    body: '{"status": "packaging_done", "packaging": {{ outputs.generate_packaging.outputs.packaging | json }}}'
+
+  - id: update_status_rendering
+    type: io.kestra.plugin.core.http.Request
+    uri: "{{ kv('SUPABASE_URL') }}/rest/v1/projects?id=eq.{{ inputs.project_id }}"
+    method: PATCH
+    headers:
+      apikey: "{{ kv('SUPABASE_ANON_KEY') }}"
+      Authorization: "Bearer {{ kv('SUPABASE_ANON_KEY') }}"
+      Content-Type: application/json
+    body: '{"status": "rendering"}'
+
+  - id: render_video
+    type: io.kestra.plugin.core.flow.Subflow
+    namespace: company.team
+    flowId: video-renderer
+    inputs:
+      project_id: "{{ inputs.project_id }}"
+      project_slug: "{{ json(read(outputs.parse_project.outputFiles['project_data.json'])).project_slug }}"
+      script: "{{ outputs.generate_script.outputs.script }}"
+      language: "{{ json(read(outputs.parse_project.outputFiles['project_data.json'])).language }}"
+      storage_folder: "{{ json(read(outputs.parse_project.outputFiles['project_data.json'])).storage_folder }}"
+    wait: true
+
+  - id: update_status_done
+    type: io.kestra.plugin.core.http.Request
+    uri: "{{ kv('SUPABASE_URL') }}/rest/v1/projects?id=eq.{{ inputs.project_id }}"
+    method: PATCH
+    headers:
+      apikey: "{{ kv('SUPABASE_ANON_KEY') }}"
+      Authorization: "Bearer {{ kv('SUPABASE_ANON_KEY') }}"
+      Content-Type: application/json
+    body: '{"status": "done", "final_video_url": {{ outputs.render_video.outputs.final_video_url | json }}, "completed_at": "{{ now() }}"}'
+
+  - id: mark_source_processed
+    type: io.kestra.plugin.core.http.Request
+    uri: "{{ kv('SUPABASE_URL') }}/rest/v1/processed_videos"
+    method: POST
+    headers:
+      apikey: "{{ kv('SUPABASE_ANON_KEY') }}"
+      Authorization: "Bearer {{ kv('SUPABASE_ANON_KEY') }}"
+      Content-Type: application/json
+    body: '{"source_video_url": {{ json(read(outputs.parse_project.outputFiles[''project_data.json''])).source_video_url | json }}}'
+
+errors:
+  - id: handle_error
+    type: io.kestra.plugin.core.http.Request
+    uri: "{{ kv('SUPABASE_URL') }}/rest/v1/projects?id=eq.{{ inputs.project_id }}"
+    method: PATCH
+    headers:
+      apikey: "{{ kv('SUPABASE_ANON_KEY') }}"
+      Authorization: "Bearer {{ kv('SUPABASE_ANON_KEY') }}"
+      Content-Type: application/json
+    body: '{"status": "error", "error_message": "{{ execution.error.message | default(''Unknown error'') }}"}'

@@ -1,0 +1,621 @@
+id: video-renderer
+namespace: company.team
+description: |
+  Main video rendering workflow that:
+  1. Generates B-Roll images with AI
+  2. Creates voiceover with Kokoro TTS
+  3. Generates captions with AssemblyAI
+  4. Renders final video with FFmpeg
+
+labels:
+  project: faceless-video-generator
+  type: subflow
+
+inputs:
+  - id: project_id
+    type: STRING
+    description: Project UUID
+  - id: project_slug
+    type: STRING
+    description: URL-safe project name
+  - id: script
+    type: STRING
+    description: Full video script
+  - id: language
+    type: STRING
+    description: Target language code
+    defaults: pt-BR
+  - id: storage_folder
+    type: STRING
+    description: MinIO storage folder path
+
+outputs:
+  - id: final_video_url
+    type: STRING
+    value: "{{ outputs.upload_final_video.vars.video_url }}"
+
+tasks:
+  - id: get_voice_profile
+    type: io.kestra.plugin.core.http.Request
+    uri: "{{ kv('SUPABASE_URL') }}/rest/v1/voice_profiles?language=eq.{{ inputs.language }}&is_default=eq.true&limit=1"
+    method: GET
+    headers:
+      apikey: "{{ kv('SUPABASE_ANON_KEY') }}"
+      Authorization: "Bearer {{ kv('SUPABASE_ANON_KEY') }}"
+
+  - id: parse_voice_profile
+    type: io.kestra.plugin.scripts.python.Script
+    inputFiles:
+      profiles.json: "{{ outputs.get_voice_profile.body }}"
+    script: |
+      import json
+      
+      with open('profiles.json', 'r') as f:
+          profiles = json.load(f)
+      
+      if profiles:
+          profile = profiles[0]
+          voice_id = profile['voice_id']
+          speed = profile.get('speed', 1.0)
+      else:
+          voice_id = 'pt_BR-faber-medium'
+          speed = 1.0
+      
+      print("Using voice: " + voice_id + " at speed " + str(speed))
+      print("::output voice_id::" + voice_id)
+      print("::output speed::" + str(speed))
+
+  - id: generate_image_prompts
+    type: io.kestra.plugin.scripts.python.Script
+    beforeCommands:
+      - pip install google-generativeai > /dev/null 2>&1
+    env:
+      GOOGLE_API_KEY: "{{ kv('GOOGLE_API_KEY') }}"
+    script: |
+      import google.generativeai as genai
+      import os
+      import json
+      import re
+      
+      genai.configure(api_key=os.environ['GOOGLE_API_KEY'])
+      model = genai.GenerativeModel('gemini-2.0-flash')
+      
+      script = """{{ inputs.script }}"""[:10000]
+      
+      prompt_lines = [
+          "Analyze this script and create 6 image prompts for visual storytelling.",
+          "",
+          "Script:",
+          script,
+          "",
+          "Create 6 scene prompts featuring the main female character in different story situations.",
+          "All scenes should depict moments that do NOT reveal the ending.",
+          "",
+          "IMPORTANT CHARACTER GUIDELINES:",
+          "- Describe a 50-70 year old woman with specific features",
+          "- Avoid words like: wrinkles, weary, tired, weathered, aged, worn",
+          "- Keep her appearance dignified and relatable",
+          "",
+          "Each prompt should:",
+          "1. Start with detailed character description (same across all)",
+          "2. Describe the scene, setting, action, emotion",
+          "3. Be in ENGLISH (for image generation)",
+          "4. Be 2-4 sentences maximum",
+          "5. NOT contain any graphic content, violence, or people under 18",
+          "",
+          "OUTPUT FORMAT (JSON only):",
+          '{"scene_prompts": [{"prompt_id": "scene_01", "prompt_text": "..."}, {"prompt_id": "scene_02", "prompt_text": "..."}, {"prompt_id": "scene_03", "prompt_text": "..."}, {"prompt_id": "scene_04", "prompt_text": "..."}, {"prompt_id": "scene_05", "prompt_text": "..."}, {"prompt_id": "scene_06", "prompt_text": "..."}]}'
+      ]
+      prompt = "\n".join(prompt_lines)
+      
+      response = model.generate_content(
+          prompt,
+          generation_config=genai.GenerationConfig(
+              temperature=0.8,
+              response_mime_type="application/json"
+          )
+      )
+      
+      try:
+          prompts = json.loads(response.text)
+      except:
+          match = re.search(r'\{[\s\S]*\}', response.text)
+          if match:
+              prompts = json.loads(match.group())
+          else:
+              prompts = {"scene_prompts": []}
+      
+      with open('image_prompts.json', 'w') as f:
+          json.dump(prompts, f, indent=2)
+      
+      print("Generated " + str(len(prompts.get('scene_prompts', []))) + " image prompts")
+    outputFiles:
+      - image_prompts.json
+
+  - id: generate_images
+    type: io.kestra.plugin.core.flow.ForEach
+    values: "{{ read(outputs.generate_image_prompts.outputFiles['image_prompts.json']) | jq('.scene_prompts[]') }}"
+    concurrencyLimit: 2
+    tasks:
+      - id: create_image
+        type: io.kestra.plugin.scripts.python.Script
+        beforeCommands:
+          - pip install requests > /dev/null 2>&1
+        env:
+          REPLICATE_API_TOKEN: "{{ kv('REPLICATE_API_TOKEN') }}"
+        script: |
+          import requests
+          import os
+          import json
+          import time
+          
+          prompt_data = json.loads('''{{ taskrun.value }}''')
+          prompt_id = prompt_data['prompt_id']
+          prompt_text = prompt_data['prompt_text']
+          
+          headers = {
+              'Authorization': 'Token ' + os.environ['REPLICATE_API_TOKEN'],
+              'Content-Type': 'application/json',
+              'Prefer': 'wait'
+          }
+          
+          payload = {
+              "input": {
+                  "width": 1280,
+                  "height": 720,
+                  "prompt": prompt_text,
+                  "output_format": "jpg",
+                  "guidance_scale": 0,
+                  "output_quality": 80,
+                  "num_inference_steps": 8
+              }
+          }
+          
+          response = requests.post(
+              'https://api.replicate.com/v1/models/prunaai/z-image-turbo/predictions',
+              headers=headers,
+              json=payload,
+              timeout=120
+          )
+          
+          if response.status_code != 201:
+              raise Exception("Failed to create prediction: " + response.text)
+          
+          result = response.json()
+          prediction_id = result['id']
+          max_attempts = 60
+          
+          while result['status'] not in ['succeeded', 'failed', 'canceled']:
+              time.sleep(2)
+              response = requests.get(
+                  "https://api.replicate.com/v1/predictions/" + prediction_id,
+                  headers={'Authorization': headers['Authorization']}
+              )
+              result = response.json()
+              max_attempts -= 1
+              if max_attempts <= 0:
+                  raise Exception("Image generation timeout")
+          
+          if result['status'] != 'succeeded':
+              raise Exception("Image generation failed: " + str(result.get('error')))
+          
+          output_url = result['output']
+          if isinstance(output_url, list):
+              output_url = output_url[0]
+          
+          img_response = requests.get(output_url)
+          
+          filename = prompt_id + '.jpg'
+          with open(filename, 'wb') as f:
+              f.write(img_response.content)
+          
+          print("Generated image: " + prompt_id)
+          print("::output prompt_id::" + prompt_id)
+          print("::output image_url::" + output_url)
+        outputFiles:
+          - "*.jpg"
+
+  - id: create_video_clips
+    type: io.kestra.plugin.core.flow.ForEach
+    values: ["scene_01", "scene_02", "scene_03", "scene_04", "scene_05", "scene_06"]
+    concurrencyLimit: 2
+    tasks:
+      - id: add_zoom_effect
+        type: io.kestra.plugin.scripts.python.Script
+        beforeCommands:
+          - apt-get update -qq && apt-get install -y -qq ffmpeg > /dev/null 2>&1
+        inputFiles:
+          image.jpg: "{{ outputs.generate_images.outputs.create_image[loop.index].outputFiles[taskrun.value + '.jpg'] | default('') }}"
+        script: |
+          import subprocess
+          import os
+          
+          scene_id = "{{ taskrun.value }}"
+          input_file = "image.jpg"
+          output_file = scene_id + ".mp4"
+          
+          if not os.path.exists(input_file) or os.path.getsize(input_file) < 1000:
+              cmd = [
+                  'ffmpeg', '-y',
+                  '-f', 'lavfi',
+                  '-i', 'color=c=black:s=1920x1080:d=10:r=30',
+                  '-c:v', 'libx264',
+                  '-preset', 'fast',
+                  output_file
+              ]
+          else:
+              cmd = [
+                  'ffmpeg', '-y',
+                  '-loop', '1',
+                  '-i', input_file,
+                  '-vf', "scale=5760:3240,zoompan=z='1+on*0.0005':d=300:x='trunc(iw/2-(iw/zoom/2))':y='trunc(ih/2-(ih/zoom/2))':s=1920x1080:fps=30,format=yuv420p",
+                  '-c:v', 'libx264',
+                  '-t', '10',
+                  '-r', '30',
+                  '-crf', '23',
+                  '-preset', 'fast',
+                  output_file
+              ]
+          
+          result = subprocess.run(cmd, capture_output=True, text=True)
+          
+          if result.returncode != 0:
+              print("FFmpeg error: " + result.stderr)
+              raise Exception("Failed to create video clip: " + result.stderr)
+          
+          print("Created clip: " + output_file)
+          print("::output clip_file::" + output_file)
+        outputFiles:
+          - "*.mp4"
+
+  - id: merge_clips
+    type: io.kestra.plugin.scripts.python.Script
+    beforeCommands:
+      - apt-get update -qq && apt-get install -y -qq ffmpeg > /dev/null 2>&1
+    inputFiles:
+      scene_01.mp4: "{{ outputs.create_video_clips.outputs.add_zoom_effect[0].outputFiles['scene_01.mp4'] }}"
+      scene_02.mp4: "{{ outputs.create_video_clips.outputs.add_zoom_effect[1].outputFiles['scene_02.mp4'] }}"
+      scene_03.mp4: "{{ outputs.create_video_clips.outputs.add_zoom_effect[2].outputFiles['scene_03.mp4'] }}"
+      scene_04.mp4: "{{ outputs.create_video_clips.outputs.add_zoom_effect[3].outputFiles['scene_04.mp4'] }}"
+      scene_05.mp4: "{{ outputs.create_video_clips.outputs.add_zoom_effect[4].outputFiles['scene_05.mp4'] }}"
+      scene_06.mp4: "{{ outputs.create_video_clips.outputs.add_zoom_effect[5].outputFiles['scene_06.mp4'] }}"
+    script: |
+      import subprocess
+      import os
+      
+      clips = []
+      for i in range(1, 7):
+          clip = "scene_" + str(i).zfill(2) + ".mp4"
+          if os.path.exists(clip):
+              clips.append(clip)
+      
+      if not clips:
+          raise Exception("No video clips found")
+      
+      with open('concat.txt', 'w') as f:
+          for clip in clips:
+              f.write("file '" + clip + "'\n")
+      
+      cmd = [
+          'ffmpeg', '-y',
+          '-f', 'concat',
+          '-safe', '0',
+          '-i', 'concat.txt',
+          '-c:v', 'libx264',
+          '-preset', 'fast',
+          '-crf', '23',
+          'loop_video.mp4'
+      ]
+      
+      result = subprocess.run(cmd, capture_output=True, text=True)
+      
+      if result.returncode != 0:
+          print("Error: " + result.stderr)
+          raise Exception("Failed to merge clips: " + result.stderr)
+      
+      print("Created loop video: loop_video.mp4")
+    outputFiles:
+      - loop_video.mp4
+
+  - id: generate_voiceover
+    type: io.kestra.plugin.scripts.python.Script
+    beforeCommands:
+      - pip install requests > /dev/null 2>&1
+    env:
+      KOKORO_BASE_URL: "{{ kv('KOKO_BASE_URL') }}"
+      KOKORO_API_KEY: "{{ kv('KOKORO_API') }}"
+    script: |
+      import requests
+      import os
+      
+      base_url = os.environ['KOKORO_BASE_URL'].rstrip('/')
+      api_key = os.environ['KOKORO_API_KEY']
+      voice_id = "{{ outputs.parse_voice_profile.vars.voice_id }}"
+      speed = float("{{ outputs.parse_voice_profile.vars.speed }}")
+      
+      script = """{{ inputs.script }}"""
+      
+      script = script.replace('\n\n', ' ').replace('\n', ' ')
+      script = ' '.join(script.split())
+      
+      headers = {
+          'Authorization': 'Bearer ' + api_key,
+          'Content-Type': 'application/json'
+      }
+      
+      payload = {
+          'model': 'kokoro',
+          'input': script,
+          'voice': voice_id,
+          'speed': speed,
+          'response_format': 'mp3'
+      }
+      
+      print("Generating voiceover with voice: " + voice_id)
+      print("Script length: " + str(len(script)) + " characters")
+      
+      response = requests.post(
+          base_url + "/v1/audio/speech",
+          headers=headers,
+          json=payload,
+          timeout=600
+      )
+      
+      if response.status_code != 200:
+          raise Exception("TTS failed: " + str(response.status_code) + " - " + response.text)
+      
+      with open('voiceover.mp3', 'wb') as f:
+          f.write(response.content)
+      
+      print("Generated voiceover: " + str(len(response.content)) + " bytes")
+    outputFiles:
+      - voiceover.mp3
+
+  - id: transcribe_audio
+    type: io.kestra.plugin.scripts.python.Script
+    beforeCommands:
+      - pip install requests > /dev/null 2>&1
+    env:
+      ASSEMBLYAI_API_KEY: "{{ kv('ASSEMBLYAI_API_KEY') }}"
+    inputFiles:
+      voiceover.mp3: "{{ outputs.generate_voiceover.outputFiles['voiceover.mp3'] }}"
+    script: |
+      import requests
+      import os
+      import time
+      
+      api_key = os.environ['ASSEMBLYAI_API_KEY']
+      headers = {'authorization': api_key}
+      
+      language_code = "{{ inputs.language }}"
+      
+      lang_map = {
+          'pt-BR': 'pt',
+          'en-US': 'en',
+          'es-ES': 'es',
+          'ja-JP': 'ja',
+          'it-IT': 'it'
+      }
+      aai_lang = lang_map.get(language_code, 'en')
+      
+      print("Uploading audio to AssemblyAI...")
+      with open('voiceover.mp3', 'rb') as f:
+          upload_response = requests.post(
+              'https://api.assemblyai.com/v2/upload',
+              headers=headers,
+              data=f
+          )
+      
+      audio_url = upload_response.json()['upload_url']
+      print("Upload complete: " + audio_url)
+      
+      transcript_request = {
+          'audio_url': audio_url,
+          'language_code': aai_lang,
+          'punctuate': True,
+          'format_text': True
+      }
+      
+      response = requests.post(
+          'https://api.assemblyai.com/v2/transcript',
+          headers=headers,
+          json=transcript_request
+      )
+      
+      transcript_id = response.json()['id']
+      print("Transcription started: " + transcript_id)
+      
+      while True:
+          response = requests.get(
+              'https://api.assemblyai.com/v2/transcript/' + transcript_id,
+              headers=headers
+          )
+          result = response.json()
+          
+          if result['status'] == 'completed':
+              break
+          elif result['status'] == 'error':
+              raise Exception("Transcription failed: " + str(result.get('error')))
+          
+          print("Status: " + result['status'])
+          time.sleep(5)
+      
+      srt_response = requests.get(
+          "https://api.assemblyai.com/v2/transcript/" + transcript_id + "/srt",
+          headers=headers,
+          params={'chars_per_caption': 42}
+      )
+      
+      srt_content = srt_response.text
+      
+      lines = srt_content.split('\n')
+      adjusted_lines = []
+      
+      def parse_time(t):
+          h, m, rest = t.split(':')
+          s, ms = rest.split(',')
+          return int(h)*3600000 + int(m)*60000 + int(s)*1000 + int(ms)
+      
+      def format_time(ms):
+          if ms < 0:
+              ms = 0
+          h = ms // 3600000
+          ms = ms % 3600000
+          m = ms // 60000
+          ms = ms % 60000
+          s = ms // 1000
+          ms = ms % 1000
+          return str(h).zfill(2) + ":" + str(m).zfill(2) + ":" + str(s).zfill(2) + "," + str(ms).zfill(3)
+      
+      SHIFT_MS = -600
+      
+      for line in lines:
+          if ' --> ' in line:
+              start, end = line.split(' --> ')
+              start_ms = parse_time(start.strip()) + SHIFT_MS
+              end_ms = parse_time(end.strip()) + SHIFT_MS
+              line = format_time(start_ms) + " --> " + format_time(end_ms)
+          adjusted_lines.append(line)
+      
+      adjusted_srt = '\n'.join(adjusted_lines)
+      
+      with open('captions.srt', 'w', encoding='utf-8') as f:
+          f.write(adjusted_srt)
+      
+      print("Captions generated and adjusted")
+    outputFiles:
+      - captions.srt
+
+  - id: render_final_video
+    type: io.kestra.plugin.scripts.python.Script
+    beforeCommands:
+      - apt-get update -qq && apt-get install -y -qq ffmpeg fonts-dejavu > /dev/null 2>&1
+    inputFiles:
+      loop_video.mp4: "{{ outputs.merge_clips.outputFiles['loop_video.mp4'] }}"
+      voiceover.mp3: "{{ outputs.generate_voiceover.outputFiles['voiceover.mp3'] }}"
+      captions.srt: "{{ outputs.transcribe_audio.outputFiles['captions.srt'] }}"
+    script: |
+      import subprocess
+      import os
+      
+      project_slug = "{{ inputs.project_slug }}"
+      output_file = project_slug + ".mp4"
+      
+      probe_cmd = [
+          'ffprobe', '-v', 'error',
+          '-show_entries', 'format=duration',
+          '-of', 'default=noprint_wrappers=1:nokey=1',
+          'voiceover.mp3'
+      ]
+      result = subprocess.run(probe_cmd, capture_output=True, text=True)
+      audio_duration = float(result.stdout.strip())
+      print("Audio duration: " + str(audio_duration) + "s")
+      
+      srt_path = os.path.abspath('captions.srt').replace('\\', '/').replace(':', '\\:')
+      
+      cmd = [
+          'ffmpeg', '-y',
+          '-stream_loop', '-1',
+          '-i', 'loop_video.mp4',
+          '-i', 'voiceover.mp3',
+          '-vf', "subtitles='" + srt_path + "':force_style='FontSize=24,PrimaryColour=&H00FFFF&,OutlineColour=&H000000&,Outline=2,Alignment=2,MarginV=50'",
+          '-map', '0:v',
+          '-map', '1:a',
+          '-c:v', 'libx264',
+          '-preset', 'medium',
+          '-crf', '23',
+          '-c:a', 'aac',
+          '-b:a', '192k',
+          '-t', str(audio_duration),
+          '-shortest',
+          output_file
+      ]
+      
+      print("Rendering final video...")
+      result = subprocess.run(cmd, capture_output=True, text=True)
+      
+      if result.returncode != 0:
+          print("FFmpeg error: " + result.stderr)
+          cmd_no_subs = [
+              'ffmpeg', '-y',
+              '-stream_loop', '-1',
+              '-i', 'loop_video.mp4',
+              '-i', 'voiceover.mp3',
+              '-map', '0:v',
+              '-map', '1:a',
+              '-c:v', 'libx264',
+              '-preset', 'medium',
+              '-crf', '23',
+              '-c:a', 'aac',
+              '-b:a', '192k',
+              '-t', str(audio_duration),
+              '-shortest',
+              output_file
+          ]
+          result = subprocess.run(cmd_no_subs, capture_output=True, text=True)
+          
+          if result.returncode != 0:
+              raise Exception("Failed to render video: " + result.stderr)
+          print("Rendered without subtitles (fallback)")
+      else:
+          print("Rendered with subtitles")
+      
+      file_size = os.path.getsize(output_file) / (1024*1024)
+      print("Final video: " + output_file + " (" + str(round(file_size, 1)) + " MB)")
+    outputFiles:
+      - "*.mp4"
+
+  - id: upload_final_video
+    type: io.kestra.plugin.scripts.python.Script
+    beforeCommands:
+      - pip install minio > /dev/null 2>&1
+    env:
+      MINIO_ENDPOINT: "{{ kv('MINIO_ENDPOINT') }}"
+      MINIO_ACCESS_KEY: "{{ kv('MINIO_ACCESS_KEY') }}"
+      MINIO_SECRET_KEY: "{{ kv('MINIO_SECRET_KEY') }}"
+      MINIO_BUCKET: "{{ kv('MINIO_BUCKET') }}"
+    inputFiles:
+      final_video.mp4: "{{ outputs.render_final_video.outputFiles[inputs.project_slug + '.mp4'] }}"
+    script: |
+      from minio import Minio
+      from urllib.parse import urlparse
+      import os
+      
+      endpoint = os.environ['MINIO_ENDPOINT']
+      access_key = os.environ['MINIO_ACCESS_KEY']
+      secret_key = os.environ['MINIO_SECRET_KEY']
+      bucket = os.environ['MINIO_BUCKET']
+      
+      storage_folder = "{{ inputs.storage_folder }}"
+      project_slug = "{{ inputs.project_slug }}"
+      
+      parsed = urlparse(endpoint)
+      host = parsed.netloc or parsed.path
+      secure = parsed.scheme == 'https'
+      
+      if ':' in host:
+          host_parts = host.split(':')
+          host = host_parts[0]
+          if parsed.port:
+              host = host + ":" + str(parsed.port)
+      
+      client = Minio(
+          host,
+          access_key=access_key,
+          secret_key=secret_key,
+          secure=secure
+      )
+      
+      object_name = storage_folder + "/" + project_slug + ".mp4"
+      
+      client.fput_object(
+          bucket,
+          object_name,
+          'final_video.mp4',
+          content_type='video/mp4'
+      )
+      
+      video_url = endpoint.rstrip('/') + "/" + bucket + "/" + object_name
+      
+      print("Uploaded to: " + video_url)
+      print("::output video_url::" + video_url)

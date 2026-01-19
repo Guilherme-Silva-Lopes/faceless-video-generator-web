@@ -1,0 +1,5224 @@
+Encontrei esse template de automação no n8n para geração de videos faceless. Quero que você entenda tudo que ela faz e recrie usando código e o Kestra. A ideia é que seja um app com uma interface simples que eu possa usar para configurar a automação para criar videos para diferentes tpos de canais e idiomas e que essa interface esteja conectada aos workflows no Kestra. Me diga como funciona e também me fale tudo que você precisa da minha parte, como credenciais, chaves de api, etc... Ja tenho o Minio e o Kestra instalados na minha vps via Easypanel. Quanto aos modelos de IA, eu quero que você use o gemini-3-flash para as arefas que envolvem geração de texto e vision ao invés de usar os modelos do openrouter que estão no template. E no lugar do NocoDB, eu quero que você use o Supabase. Os workflows do kestra devem ser criados no Namespace: "company.team" e as credenciais, chaves de api e urls necessárias devem vir da "KV Store" do Kestra (a api key do gemini já está na kv store na chave "GOOGLE_API_KEY"). Por favor planeje o sistema e me diga tudo que será preciso, bem como posso fazer para colocarf a interface do app no ar (se possível pelo easypanel mesmo, mas se não por outro serviço). Me diga tudo que será necessário e fme faça quaisquer perguntas achar necessárias.
+
+Os jsons dos workflows no github do criador:
+
+@nickwinteryta
+nickwinteryta/0. Idea Scraper Workflow Secret
+Created last month • Report abuse
+Code
+Revisions
+1
+Stars
+12
+Forks
+8
+Clone this repository at &lt;script src=&quot;https://gist.github.com/nickwinteryta/3fc2e288d7b1181a884b91b90897681d.js&quot;&gt;&lt;/script&gt;
+<script src="https://gist.github.com/nickwinteryta/3fc2e288d7b1181a884b91b90897681d.js"></script>
+0. Idea Scraper Workflow
+0. Idea Scraper Workflow
+{
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -2608,
+        976
+      ],
+      "id": "cb98c34d-4cb5-473b-9ccb-6cf4ff0d536d",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 12
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -3104,
+        1088
+      ],
+      "id": "ff0b6d85-5811-45ed-81d1-4f084d31ad77",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        -2496,
+        752
+      ],
+      "id": "c46285ca-a017-4068-b0f4-bd0edf6a28ef",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        -1632,
+        736
+      ],
+      "id": "c3e1b150-43a5-4ad7-983d-59ecd7c19b46",
+      "name": "Aggregate1"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -3104,
+        928
+      ],
+      "id": "5cbd0cf4-0126-40e6-b7e9-f04c37b9dcc8",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "url": "Your-Organizer-Workflow-Webhook-URL",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -720,
+        640
+      ],
+      "id": "ca8ca786-9a03-4a36-b018-c436635df8c9",
+      "name": "Start Video Production"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        -912,
+        640
+      ],
+      "id": "846b3533-cc27-4c4d-8968-7e35997159e4",
+      "name": "1 Item"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -1216,
+        656
+      ],
+      "id": "2f5beb18-aa52-4340-ac03-b286f6521726",
+      "name": "Loop Through Viral Urls"
+    },
+    {
+      "parameters": {
+        "authentication": "nocoDbApiToken",
+        "operation": "update",
+        "projectId": "=Base-Name",
+        "table": "=Table-Name",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "Id",
+              "fieldValue": "={{ $json.Id }}"
+            },
+            {
+              "fieldName": "Source Video URL",
+              "fieldValue": "={{ $json.url }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.nocoDb",
+      "typeVersion": 3,
+      "position": [
+        -1056,
+        720
+      ],
+      "id": "dfbf7b83-0089-4d8c-991e-f40bcf1839c9",
+      "name": "Add Viral URLS to Sheet",
+      "credentials": {
+        "nocoDbApiToken": {
+          "id": "qvsAfhIybkPMEqJB",
+          "name": "Your API Key for NocoDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -1376,
+        448
+      ],
+      "id": "f3111990-9e05-4668-ac66-2f2e8246cdd9",
+      "name": "Merge Each URL with Row ID"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Run Once for All Items - filters videos and outputs only URLs\nconst NOW = new Date(); // current execution time\n\nfunction hoursSince(dateIso) {\n  const d = new Date(dateIso);\n  if (isNaN(d.getTime())) return Infinity; // invalid date won't pass time-based rule\n  return (NOW - d) / 36e5; // ms to hours\n}\n\nfunction passes(video) {\n  const views = Number(video?.views ?? 0);\n  const ageH = hoursSince(video?.published);\n  // New filter: exclude videos older than 48 hours (2 days)\n  if (ageH > 48) return false;\n  // Rule A: any age (within 48h), strictly more than 9,000 total views\n  if (views > 7000) return true;\n  // Rule B: otherwise, at least 4,000 views within first 8 hours\n  if (views >= 4000 && ageH <= 12) return true;\n  return false;\n}\n\n// Get the data array from the first item\nconst input = items[0].json ?? items[0];\nconst data = Array.isArray(input.data) ? input.data : [];\n\n// Filter and map to URLs in one step\nconst filtered = data.filter(passes);\n\nreturn filtered.map(video => {\n  return {\n    json: {\n      url: video.url\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2272,
+        752
+      ],
+      "id": "1e23045b-b4d8-4746-b72c-a5c5aaa4e558",
+      "name": "Filter for Viral Videos"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Input: Das geparste JSON aus der XML Node (items[0].json)\nconst feed = items[0].json.feed;  // Oder passe an, falls der Pfad anders ist\nconst entries = feed.entry || [];  // Array der Videos\n\n// Extrahiere und mappe die Daten\nconst extractedVideos = entries.map(entry => {\n  return {\n    url: entry.link.href || '',  // Video-URL (im Beispiel ist es ein Objekt ohne @, also .href)\n    title: entry.title || '',  // Titel\n    views: parseInt(entry['media:group']['media:community']['media:statistics'].views || 0, 10),  // Aufrufe als Number (im Beispiel ohne @, direkt 'views')\n    published: entry.published || ''  // Upload-Datum (ISO-Format)\n  };\n});\n\n// Sortierung nach Published absteigend (neueste Videos zuerst)\nextractedVideos.sort((a, b) => new Date(b.published) - new Date(a.published));\n\n// Output als n8n-kompatibles Array (jeder Eintrag als separates Item)\nreturn extractedVideos.map(video => ({ json: video }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2080,
+        992
+      ],
+      "id": "9e9a4f58-473f-4345-93c3-53b502cd5201",
+      "name": "Clean Up Data"
+    },
+    {
+      "parameters": {
+        "authentication": "nocoDbApiToken",
+        "operation": "getAll",
+        "projectId": "=Base-Name",
+        "table": "=Table-Name",
+        "returnAll": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.nocoDb",
+      "typeVersion": 3,
+      "position": [
+        -2336,
+        576
+      ],
+      "id": "46dfaae1-32f1-471b-82b7-2e96391800b9",
+      "name": "Get All Rows from Channel Sheet",
+      "credentials": {
+        "nocoDbApiToken": {
+          "id": "qvsAfhIybkPMEqJB",
+          "name": "Your API Key for NocoDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "['Source Video URL']",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -2144,
+        576
+      ],
+      "id": "e339b566-3c65-4d44-9557-ef338ad1e16c",
+      "name": "Only Output YT Links"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3b49d242-91ea-4b66-8830-2094894f96bd",
+              "leftValue": "={{ $json['[\\'Source Video URL\\']'] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        -1952,
+        576
+      ],
+      "id": "b51f9aba-7391-4e0c-ab9f-1ee5d70639a9",
+      "name": "Remove Empty Fields"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -1792,
+        736
+      ],
+      "id": "bfb0d2f0-8eca-4109-a94c-5c6c1ba60c24",
+      "name": "Merge Viral & Existing YT Links"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Access the input data from the first item\nconst inputData = items[0].json.data;\n\n// Collect existing YT links into a Set for quick lookup and uniqueness\nconst existingLinks = new Set();\nconst newUrls = [];\n\n// Iterate through the data array to separate existing and new URLs\nfor (const obj of inputData) {\n  if (obj[\"['Source Video URL']\"]) {\n    existingLinks.add(obj[\"['Source Video URL']\"]);\n  } else if (obj.url) {\n    newUrls.push(obj.url);\n  }\n}\n\n// Filter new URLs to remove those that exist in the database links,\n// then use a Set to deduplicate any remaining doubles among new URLs\nconst filteredUniqueNew = new Set(newUrls.filter(url => !existingLinks.has(url)));\n\n// Return the filtered unique new URLs as an array of items\nreturn [...filteredUniqueNew].map(url => ({ json: { url } }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1488,
+        736
+      ],
+      "id": "9203b3c4-df66-46eb-8fcd-bac51e0d77f5",
+      "name": "Only Output Viral, Unique Videos"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ab8f5bc3-9cf0-403e-9bdb-15bc81b168a7",
+              "name": "@ChannelHandle",
+              "value": "channel-id",
+              "type": "string"
+            },
+            {
+              "id": "5daed8dc-1ac0-400a-b838-1e6f40963443",
+              "name": "@ChannelHandle",
+              "value": "channel-id",
+              "type": "string"
+            },
+            {
+              "id": "0aa545ef-14a3-42a6-bbea-8db9247c95c2",
+              "name": "@ChannelHandle",
+              "value": "channel-id",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2944,
+        976
+      ],
+      "id": "cd9cafbd-4c19-49aa-8bce-e0cb95fd4fd8",
+      "name": "Viral Revenge Channels"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the input object (first item)\nconst inputObj = items[0].json;\n\n// Extract all channel IDs (values) and create separate items\nconst channelIds = Object.values(inputObj);\n\nreturn channelIds.map(channelId => {\n  return {\n    json: {\n      \"channel-id\": channelId\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2784,
+        976
+      ],
+      "id": "9b9b8a03-0165-404a-9536-105dbcdc94d8",
+      "name": "Fix Format"
+    },
+    {
+      "parameters": {
+        "url": "https://www.youtube.com/feeds/videos.xml",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "channel_id",
+              "value": "={{ $json['channel-id'] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -2432,
+        992
+      ],
+      "id": "4da63e46-abf0-457e-aea8-27d204e59be8",
+      "name": "Get Latest Upload Data"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.xml",
+      "typeVersion": 1,
+      "position": [
+        -2256,
+        992
+      ],
+      "id": "ffa962aa-8140-404c-842c-defc7b0c1876",
+      "name": "Format XML -> JSON"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -1920,
+        992
+      ],
+      "id": "793c185f-7ae5-41c6-9b05-42e6d65b62f8",
+      "name": "Wait 5s",
+      "webhookId": "53a9a794-a37a-44ed-b301-87014d867adf"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "392830aa-ab4c-48bd-bcdb-a5368244317f",
+              "leftValue": "={{ $json['Source Video URL'] }}",
+              "rightValue": "Queued",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        -2032,
+        432
+      ],
+      "id": "6b3576f9-56df-44c9-9ac9-6e10130a1328",
+      "name": "Get Empty Fields",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "content": "## Scrape Channel Uploads",
+        "height": 272,
+        "width": 1216,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -2976,
+        928
+      ],
+      "id": "0d231a5e-9791-4810-ae1e-4323d10ca08f",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## Filter for Viral & Unique YT-Urls",
+        "height": 384,
+        "width": 1216,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -2512,
+        528
+      ],
+      "id": "b050500a-7dc8-4886-b872-5fd94d8cab31",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## Add Viral Videos to Sheet",
+        "height": 304,
+        "width": 720,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1280,
+        608
+      ],
+      "id": "1532c1b0-cc4b-4f52-92e9-d819893f0be0",
+      "name": "Sticky Note2"
+    }
+  ],
+  "connections": {
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Latest Upload Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Viral Revenge Channels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Filter for Viral Videos",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get All Rows from Channel Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate1": {
+      "main": [
+        [
+          {
+            "node": "Only Output Viral, Unique Videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Viral Revenge Channels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1 Item": {
+      "main": [
+        [
+          {
+            "node": "Start Video Production",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Through Viral Urls": {
+      "main": [
+        [
+          {
+            "node": "1 Item",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Add Viral URLS to Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Viral URLS to Sheet": {
+      "main": [
+        [
+          {
+            "node": "Loop Through Viral Urls",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Each URL with Row ID": {
+      "main": [
+        [
+          {
+            "node": "Loop Through Viral Urls",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter for Viral Videos": {
+      "main": [
+        [
+          {
+            "node": "Merge Viral & Existing YT Links",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Clean Up Data": {
+      "main": [
+        [
+          {
+            "node": "Wait 5s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Rows from Channel Sheet": {
+      "main": [
+        [
+          {
+            "node": "Only Output YT Links",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Empty Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Only Output YT Links": {
+      "main": [
+        [
+          {
+            "node": "Remove Empty Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove Empty Fields": {
+      "main": [
+        [
+          {
+            "node": "Merge Viral & Existing YT Links",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Viral & Existing YT Links": {
+      "main": [
+        [
+          {
+            "node": "Aggregate1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Only Output Viral, Unique Videos": {
+      "main": [
+        [
+          {
+            "node": "Merge Each URL with Row ID",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Viral Revenge Channels": {
+      "main": [
+        [
+          {
+            "node": "Fix Format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fix Format": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Latest Upload Data": {
+      "main": [
+        [
+          {
+            "node": "Format XML -> JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format XML -> JSON": {
+      "main": [
+        [
+          {
+            "node": "Clean Up Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 5s": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Empty Fields": {
+      "main": [
+        [
+          {
+            "node": "Merge Each URL with Row ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "cc3b15dabc56305739bb557c6213337e02aa6d63df357d1d6e8626826c84b0e1"
+  }
+}
+
+1. Organizer Workflow
+{
+  "nodes": [
+    {
+      "parameters": {
+        "path": "bde9cf17-a83b-4eed-86f5-3177313910e2111454754",
+        "authentication": "headerAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -2304,
+        32
+      ],
+      "id": "09181a0b-c98b-41b0-b7d1-d28191dc36d8",
+      "name": "Webhook",
+      "webhookId": "bde9cf17-a83b-4eed-86f5-3177313910e2",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "6IxRggDdH0Fh3HPY",
+          "name": "nca-toolkit ffmpeg server"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -2304,
+        192
+      ],
+      "id": "4d067f2c-3616-4432-86e0-8e4b6fc5dc2d",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b60447b2-60cd-4196-96df-3250e786e8a6",
+              "name": "Video Render API",
+              "value": "http://Your-Render-API",
+              "type": "string"
+            },
+            {
+              "id": "7ef6b116-502d-495e-8faa-0861eec70ee4",
+              "name": "Storage Bucket",
+              "value": "storage-bucket-name",
+              "type": "string"
+            },
+            {
+              "id": "b7dd83f2-2a81-4831-8e9c-a369d62e7302",
+              "name": "Videos Folder Path",
+              "value": "your/folder/path",
+              "type": "string"
+            },
+            {
+              "id": "2f0bcc38-a638-4ca1-91c7-c4bbd6b878c5",
+              "name": "Overlay Path",
+              "value": "your/overlay/path",
+              "type": "string"
+            },
+            {
+              "id": "25a3e389-ce67-4c8b-84c4-4ff804562bd8",
+              "name": "Channel Table Name",
+              "value": "Channel-Table-ID",
+              "type": "string"
+            },
+            {
+              "id": "7bd7c545-19b3-4639-ac86-7fd268fc5208",
+              "name": "Worker Table Name",
+              "value": "Worker-Table-ID",
+              "type": "string"
+            },
+            {
+              "id": "9e6cc902-8da2-4464-88b8-752b15a4f1e2",
+              "name": "Channel Base Name",
+              "value": "Channel-Base-ID",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2176,
+        112
+      ],
+      "id": "ac7a244a-3423-4cc0-91ff-e4db1733eaa1",
+      "name": "Settings"
+    },
+    {
+      "parameters": {
+        "authentication": "nocoDbApiToken",
+        "operation": "getAll",
+        "projectId": "={{ $json['Channel Base Name'] }}",
+        "table": "={{ $json['Channel Table Name'] }}",
+        "returnAll": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.nocoDb",
+      "typeVersion": 3,
+      "position": [
+        -2016,
+        112
+      ],
+      "id": "9956cd4e-c0bd-449b-ba93-9eea9b88870c",
+      "name": "Grab all Rows from Channel Sheet",
+      "credentials": {
+        "nocoDbApiToken": {
+          "id": "qvsAfhIybkPMEqJB",
+          "name": "Your API Key for NocoDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "ae8801fd-f0b7-4ddb-af67-278a744c3f79",
+                    "leftValue": "={{ $items().some(item => item.json.Status === 'Processing') }}",
+                    "rightValue": "Processing",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "false",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Clear"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $items().some(item => item.json.Status === 'Processing') }}",
+                    "rightValue": "Processing",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    },
+                    "id": "33b7a262-7e93-4362-8c0b-475e2c9cffab"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Stop"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -1824,
+        112
+      ],
+      "id": "5f95167b-8a15-431a-8057-a06ef6c3cc44",
+      "name": "Check for \"Processing\""
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "392830aa-ab4c-48bd-bcdb-a5368244317f",
+              "leftValue": "={{ $json.Status }}",
+              "rightValue": "Queued",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        -1600,
+        112
+      ],
+      "id": "50a1c079-95f6-425b-9041-c84b3add81b6",
+      "name": "Grab all \"Queued\" Ideas",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        -1424,
+        112
+      ],
+      "id": "efd865e0-34a5-4fa6-8536-5e8227985b6b",
+      "name": "Grab First Item"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "leu2XkTThWoVqAI9",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        -896,
+        112
+      ],
+      "id": "09508e3f-b930-4ddc-b0af-e1d3eff08b1b",
+      "name": "Get YT Transcript"
+    },
+    {
+      "parameters": {
+        "authentication": "nocoDbApiToken",
+        "operation": "update",
+        "projectId": "={{ $('Settings').first().json['Channel Base Name'] }}",
+        "table": "={{ $('Settings').first().json['Channel Table Name'] }}",
+        "id": "={{ $('Grab First Item').first().json.Id }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "Status",
+              "fieldValue": "=Processing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.nocoDb",
+      "typeVersion": 2,
+      "position": [
+        -1248,
+        112
+      ],
+      "id": "f9efb2aa-5a6e-4bf3-81a7-d5f06b9e5c04",
+      "name": "Set Status to \"Processing\"",
+      "credentials": {
+        "nocoDbApiToken": {
+          "id": "qvsAfhIybkPMEqJB",
+          "name": "Your API Key for NocoDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Based on the following video description, generate a short and descriptive title that is 5 to 8 words long.\n\n\nVideo description: “{{ $json.Summary }}”",
+        "options": {
+          "systemMessage": "You are an expert at creating short, memorable video titles. You are creative and concise. Your answer may ONLY be the title itself, without any additional text or quotation marks."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.1,
+      "position": [
+        -720,
+        112
+      ],
+      "id": "d95c4647-8d6f-41f6-8050-88baebb525a4",
+      "name": "Generate Project Name"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get all input items\nconst inputItems = $input.all();\n\n// Function to sluggify a string\nfunction sluggify(str) {\n  if (!str) return '';\n  \n  // Lowercase\n  str = str.toLowerCase();\n  \n  // Trim leading/trailing spaces\n  str = str.trim();\n  \n  // Remove all non-word, non-space, non-hyphen characters\n  str = str.replace(/[^\\w\\s-]/g, '');\n  \n  // Replace one or more spaces or underscores with a single hyphen\n  str = str.replace(/[\\s_]+/g, '-');\n  \n  // Remove leading or trailing hyphens\n  str = str.replace(/^-+|-+$/g, '');\n  \n  return str;\n}\n\n// Process each item\nconst outputItems = inputItems.map(item => {\n  const data = item.json;\n  \n  // Assume the field to sluggify is 'output'\n  const projectName = data.output;\n  \n  // Add the cleaned version as 'clean_project_name'\n  data.sluggified = sluggify(projectName);\n  \n  return { json: data };\n});\n\n// Return the modified items\nreturn outputItems;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -400,
+        16
+      ],
+      "id": "d102af12-a4b3-4046-b5a0-888f712b01b7",
+      "name": "Sluggify Name (URL-friendly)"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "08e8340a-742a-49c8-942b-afe77861e002",
+              "name": "Channel Table Name",
+              "value": "={{ $('Settings').first().json['Channel Table Name'] }}",
+              "type": "string"
+            },
+            {
+              "id": "299a40a5-4c3f-4ce6-961c-bcdd39deafe8",
+              "name": "Channel Base Name",
+              "value": "={{ $('Settings').first().json['Channel Base Name'] }}",
+              "type": "string"
+            },
+            {
+              "id": "a84e52fc-06a0-47df-9240-816f206989c0",
+              "name": "Worker Table Name",
+              "value": "={{ $('Settings').first().json['Worker Table Name'] }}",
+              "type": "string"
+            },
+            {
+              "id": "b9fe7cfe-59ab-425d-b76c-35619bf7cb38",
+              "name": "Script",
+              "value": "={{ $('Script Workflow')first().json.Script }}",
+              "type": "string"
+            },
+            {
+              "id": "c1bd76c8-0ab0-4370-b80e-2e27e6ac8e1a",
+              "name": "Storage Bucket",
+              "value": "={{ $('Settings').first().json['Storage Bucket'] }}",
+              "type": "string"
+            },
+            {
+              "id": "bb41f120-2e09-4ec9-a2f3-6336f113a49f",
+              "name": "Videos Folder Path",
+              "value": "={{ $('Settings').first().json['Videos Folder Path'] }}",
+              "type": "string"
+            },
+            {
+              "id": "8fe5ff44-e88d-46bd-aa67-9e8132d8f69b",
+              "name": "Project Name",
+              "value": "={{ $('Sluggify Name (URL-friendly)').first().json.sluggified }}",
+              "type": "string"
+            },
+            {
+              "id": "74791663-9b92-4178-84f2-640038bc7f6b",
+              "name": "Overlay Video",
+              "value": "={{ $('Settings').first().json['Overlay Path'] }}",
+              "type": "string"
+            },
+            {
+              "id": "5a219280-696a-4010-9b36-796c5232b2f1",
+              "name": "Video Render API",
+              "value": "={{ $('Settings').first().json['Video Render API'] }}",
+              "type": "string"
+            },
+            {
+              "id": "5046a7c5-236d-4595-9ce3-7e3f5b43e9fa",
+              "name": "Id",
+              "value": "={{ $('Grab First Item').first().json.Id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -160,
+        352
+      ],
+      "id": "daf9b80a-6730-4f54-a74f-57e06130336e",
+      "name": "Input for Video Generation"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6d64dbe8-fece-49ba-a70c-ed41ad567cbf",
+              "name": "Script",
+              "value": "={{ $json.Script }}",
+              "type": "string"
+            },
+            {
+              "id": "a59352bb-0216-4110-aff4-75737bf69ba0",
+              "name": "Id",
+              "value": "={{ $('Grab First Item').first().json.Id }}",
+              "type": "string"
+            },
+            {
+              "id": "ac2384b9-5195-4188-b64b-776a93a60119",
+              "name": "Source Video URL",
+              "value": "={{ $('Grab First Item').first().json['Source Video URL'] }}",
+              "type": "string"
+            },
+            {
+              "id": "8b70c8f5-3b90-412c-8d74-852ea2198f6d",
+              "name": "Channel Table Name",
+              "value": "={{ $('Settings').first().json['Channel Table Name'] }}",
+              "type": "string"
+            },
+            {
+              "id": "fa17b125-0ff4-4736-8026-4feca63f01dd",
+              "name": "Channel Base Name",
+              "value": "={{ $('Settings').first().json['Channel Base Name'] }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -160,
+        96
+      ],
+      "id": "1434951f-29f9-422f-9416-1d227088e221",
+      "name": "Input for Packaging Workflow"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "1bmeo3HjqKPuRgEd",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        16,
+        96
+      ],
+      "id": "7fc2f91e-9ed3-4fb6-bddd-103395bcad30",
+      "name": "Packaging Workflow"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "fFSFBYaUOzB9zTgp",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        16,
+        352
+      ],
+      "id": "988aafb4-bfde-4f4b-9dce-b32e10aaf501",
+      "name": "Video Generation Workflow"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3b7dfb10-df66-44e4-a9c9-175c06691514",
+              "name": "Transcript",
+              "value": "={{ $('Get YT Transcript').first().json.Transcript }}",
+              "type": "string"
+            },
+            {
+              "id": "bfb384bb-59be-425f-beff-3099d50235c0",
+              "name": "Project Name",
+              "value": "={{ $('Sluggify Name (URL-friendly)').first().json.sluggified }}",
+              "type": "string"
+            },
+            {
+              "id": "8fec0065-9918-4027-893d-abf7957be4fa",
+              "name": "Channel Base Name",
+              "value": "={{ $('Settings').first().json['Channel Base Name'] }}",
+              "type": "string"
+            },
+            {
+              "id": "06a64ff1-1f6d-40c4-a671-ce66833d50ce",
+              "name": "Channel Table Name",
+              "value": "={{ $('Settings').first().json['Channel Table Name'] }}",
+              "type": "string"
+            },
+            {
+              "id": "f5a8977f-2142-4684-bea2-f9252fef3348",
+              "name": "Id",
+              "value": "={{ $('Grab First Item').first().json.Id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -160,
+        -160
+      ],
+      "id": "32db8205-7b31-4c69-89c7-cd9da5b2dc99",
+      "name": "Input for Script Workflow"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "LtGxlOM9fcStSoHi",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        16,
+        -160
+      ],
+      "id": "34a596de-60c0-496d-a291-0f8cc1d71bba",
+      "name": "Script Workflow"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3b7dfb10-df66-44e4-a9c9-175c06691514",
+              "name": "Source Video URL",
+              "value": "={{ $('Grab First Item').item.json['Source Video URL'] }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1072,
+        112
+      ],
+      "id": "218233c7-3b17-43fb-8934-aa342b5aeced",
+      "name": "Input for Transcript Workflow"
+    },
+    {
+      "parameters": {
+        "content": "## Script Workflow",
+        "height": 208,
+        "width": 384,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -208,
+        -208
+      ],
+      "id": "a7be8458-b041-4a0a-925f-92d8c1d3e572",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## Packaging Workflow",
+        "height": 208,
+        "width": 384,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -208,
+        48
+      ],
+      "id": "46ba5fa9-e3b0-4ce3-8249-2aa281a194aa",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## Video Workflow",
+        "height": 208,
+        "width": 384,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -208,
+        304
+      ],
+      "id": "21b85892-6d80-4fe2-b1eb-789c5281a86d",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## Start Worfklow & Grab Idea",
+        "height": 368,
+        "width": 1216,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -2352,
+        -16
+      ],
+      "id": "326a727f-c7bb-45c1-9ad1-812cb46d3193",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "## Get Viral Videos Transcript & Generate Project Name",
+        "height": 368,
+        "width": 864,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1120,
+        -16
+      ],
+      "id": "8ca6c2e9-8dac-4088-958c-1d6490910829",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "model": "mistralai/devstral-2512:free",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        -720,
+        256
+      ],
+      "id": "81a1b505-bf41-4202-8530-0667887607ec",
+      "name": "Free OpenRouter Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "fXEl07gs5H5x6ULf",
+          "name": "Your OpenRouter Credentials"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "nocoDbApiToken",
+        "operation": "update",
+        "projectId": "={{ $('Settings').first().json['Channel Base Name'] }}",
+        "table": "={{ $('Settings').first().json['Channel Table Name'] }}",
+        "id": "={{ $('Grab First Item').first().json.Id }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "Project Storage Folder",
+              "fieldValue": "=https://your-minio-ip.com/browser/{{ $('Settings').first().json['Storage Bucket'] }}/{{ $('Settings').first().json['Videos Folder Path'].replaceAll(\"/\", \"%2F\") }}%2F{{ $json.sluggified.replaceAll(\"/\", \"%2F\") }}%2F"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.nocoDb",
+      "typeVersion": 2,
+      "position": [
+        -400,
+        208
+      ],
+      "id": "b8751be9-8856-4b15-a1ba-d1dee494fb10",
+      "name": "Add Project URL To Row",
+      "credentials": {
+        "nocoDbApiToken": {
+          "id": "qvsAfhIybkPMEqJB",
+          "name": "Your API Key for NocoDB"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Settings": {
+      "main": [
+        [
+          {
+            "node": "Grab all Rows from Channel Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Grab all Rows from Channel Sheet": {
+      "main": [
+        [
+          {
+            "node": "Check for \"Processing\"",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check for \"Processing\"": {
+      "main": [
+        [
+          {
+            "node": "Grab all \"Queued\" Ideas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Grab all \"Queued\" Ideas": {
+      "main": [
+        [
+          {
+            "node": "Grab First Item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Grab First Item": {
+      "main": [
+        [
+          {
+            "node": "Set Status to \"Processing\"",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get YT Transcript": {
+      "main": [
+        [
+          {
+            "node": "Generate Project Name",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Status to \"Processing\"": {
+      "main": [
+        [
+          {
+            "node": "Input for Transcript Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Project Name": {
+      "main": [
+        [
+          {
+            "node": "Sluggify Name (URL-friendly)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sluggify Name (URL-friendly)": {
+      "main": [
+        [
+          {
+            "node": "Add Project URL To Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Input for Video Generation": {
+      "main": [
+        [
+          {
+            "node": "Video Generation Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Input for Packaging Workflow": {
+      "main": [
+        [
+          {
+            "node": "Packaging Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Packaging Workflow": {
+      "main": [
+        [
+          {
+            "node": "Input for Video Generation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Input for Script Workflow": {
+      "main": [
+        [
+          {
+            "node": "Script Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Script Workflow": {
+      "main": [
+        [
+          {
+            "node": "Input for Packaging Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Input for Transcript Workflow": {
+      "main": [
+        [
+          {
+            "node": "Get YT Transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Free OpenRouter Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generate Project Name",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Project URL To Row": {
+      "main": [
+        [
+          {
+            "node": "Input for Script Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "cc3b15dabc56305739bb557c6213337e02aa6d63df357d1d6e8626826c84b0e1"
+  }
+}
+
+2. Script Workflow
+{
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -720,
+        32
+      ],
+      "id": "82aae61e-25de-4b78-9397-ca544468c3d0",
+      "name": "trigger"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Output Random Number').first().json.randomNumber }}",
+        "contextWindowLength": 4
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        1072,
+        368
+      ],
+      "id": "6b729ff6-2616-45c5-803d-f1042e818488",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        784,
+        32
+      ],
+      "id": "cf98c220-3bc4-443f-afb7-7e4d59a183d5",
+      "name": "Loop over Chapters"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e469bf15-f2af-4fa9-a7b8-2fc04931078e",
+              "name": "Script",
+              "value": "={{ $('Merge Chapters to Final Script').first().json.Script }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1520,
+        -80
+      ],
+      "id": "0d148f63-6cb2-436c-8575-19eeef9c21ae",
+      "name": "Output Script"
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * n8n Code Node: Generate a random number between 1 and 1000.\n *\n * This code generates a single item containing a JSON object.\n * The object has one key, \"randomNumber\", with a value that is a\n * random integer between 1 and 1000 (inclusive).\n *\n * How to use:\n * 1. Add a \"Code\" node to your n8n workflow.\n * 2. Copy and paste this entire code block into the JavaScript editor of the node.\n * 3. Execute the node.\n *\n * The output will be a single item like this:\n * {\n * \"json\": {\n * \"randomNumber\": 523 // (or any other random number)\n * }\n * }\n */\n\n// Generate a random integer between 1 and 1000.\nconst randomNumber = Math.floor(Math.random() * 1000) + 1;\n\n// n8n expects an array of items to be returned.\n// We'll create one item which contains our random number.\nconst newItem = {\n  json: {\n    randomNumber: randomNumber\n  }\n};\n\n// Return the new item in the expected array format.\nreturn [newItem];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        32
+      ],
+      "id": "6d8bae22-e2c7-46b5-830d-89883f77a04d",
+      "name": "Output Random Number"
+    },
+    {
+      "parameters": {
+        "model": "mistralai/devstral-2512:free",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        112,
+        352
+      ],
+      "id": "82d08ed6-0fe4-409f-a960-634af4221a24",
+      "name": "Free OpenRouter Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "fXEl07gs5H5x6ULf",
+          "name": "Your OpenRouter Credentials"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=# Story:\n\n{{ $('trigger').first().json.Transcript }}",
+        "options": {
+          "systemMessage": "=Divide the full Story below into 3 chapters following the three-act structure. Crucially, the story must begin in medias res. Therefore, Chapter 1 must start directly within the main confrontation. The key events for Chapter 1 should reflect this. For every chapter, list the 2 key events. Also give a general story overview.\n\nReally emphasize on the hook of the story. The key sentences and events from the hook (often First 5-10 Sentences) must be included!"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.1,
+      "position": [
+        -384,
+        32
+      ],
+      "id": "7feb8c84-9afd-442a-abab-d5777c98b3f2",
+      "name": "Output 3-Act-Structure from Transcript",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const youngFemaleNames = [\n  \"Anna\", \"Julia\", \"Sarah\", \"Laura\", \"Lea\", \"Hannah\", \"Lena\", \"Mia\", \"Emma\", \"Sophia\",\n  \"Emilia\", \"Lina\", \"Mila\", \"Leonie\", \"Johanna\", \"Marie\", \"Lisa\", \"Amelie\", \"Ella\", \"Clara\",\n  \"Luisa\", \"Lara\", \"Nele\", \"Pauline\", \"Greta\", \"Ida\", \"Frieda\", \"Maja\", \"Alma\", \"Matilda\",\n  \"Theresa\", \"Sofia\", \"Jennifer\", \"Stefanie\", \"Melanie\", \"Nicole\", \"Sabrina\", \"Christina\", \"Jessica\", \"Michelle\",\n  \"Yvonne\", \"Nadine\", \"Anja\", \"Katrin\", \"Daniela\", \"Sandra\", \"Katharina\", \"Franziska\", \"Sabine\", \"Claudia\"\n];\nconst oldFemaleNames = [\n  \"Brigitte\", \"Renate\", \"Karin\", \"Angelika\", \"Gabriele\", \"Gisela\", \"Ursula\", \"Helga\", \"Ingrid\", \"Christa\",\n  \"Sabine\", \"Susanne\", \"Petra\", \"Birgit\", \"Claudia\", \"Andrea\", \"Heike\", \"Bettina\", \"Martina\", \"Angela\",\n  \"Elfriede\", \"Heidrun\", \"Annette\", \"Monika\", \"Ilse\", \"Edith\", \"Hedwig\", \"Marianne\", \"Gerda\", \"Gertrude\",\n  \"Edeltraud\", \"Elsa\", \"Else\", \"Caroline\", \"Charlotte\", \"Jutta\", \"Waltraud\", \"Cornelia\", \"Tanja\", \"Kerstin\",\n  \"Ute\", \"Sigrid\", \"Rosemarie\", \"Hannelore\", \"Erika\", \"Margot\", \"Hildegard\", \"Irmgard\", \"Sieglinde\", \"Mechthild\"\n];\nconst maleNames = [\n  \"Max\", \"Paul\", \"Lukas\", \"Felix\", \"Jonas\", \"Tim\", \"Moritz\", \"Leon\", \"Finn\", \"Noah\",\n  \"Julian\", \"Elias\", \"David\", \"Matteo\", \"Luca\", \"Alexander\", \"Simon\", \"Tobias\", \"Daniel\", \"Michael\",\n  \"Thomas\", \"Andreas\", \"Stefan\", \"Christian\", \"Martin\", \"Peter\", \"Frank\", \"Klaus\", \"Dieter\", \"Jürgen\",\n  \"Hans\", \"Wolfgang\", \"Gerhard\", \"Helmut\", \"Manfred\", \"Uwe\", \"Ralf\", \"Bernd\", \"Volker\", \"Horst\",\n  \"Karl\", \"Heinrich\", \"Otto\", \"Friedrich\", \"Wilhelm\", \"Ernst\", \"Rudolf\", \"Herbert\", \"Walter\", \"Kurt\"\n];\n\nlet daughterInLaw, son, mother;\ndo {\n  daughterInLaw = youngFemaleNames[Math.floor(Math.random() * youngFemaleNames.length)];\n  son = maleNames[Math.floor(Math.random() * maleNames.length)];\n  mother = oldFemaleNames[Math.floor(Math.random() * oldFemaleNames.length)];\n} while (new Set([daughterInLaw, son, mother]).size !== 3);\n\nreturn [\n  {\n    json: {\n      daughterInLaw: daughterInLaw,\n      son: son,\n      mother: mother\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -48,
+        32
+      ],
+      "id": "9676fd39-e060-4973-b8db-0e045aec5273",
+      "name": "Choose Random Character Names"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=# The English story structure you have to adapt into German:\n\n{{ $('Output 3-Act-Structure from Transcript').first().json.output }}",
+        "options": {
+          "systemMessage": "=Adapt the complete structure to a 3-chapter long German story structure. The Characters of the story must have fitting, german names. The chapter 1 must start within the action to hook the viewer instantly. Also include a request for the viewers to comment where they are watching from and at which time, just before the climax of the first chapters Hook. the script should immediately start within the action, and before the climax of the hook, the viewer should be asked where he watches from etc. \n\nNow write the new German Story structure based on the english one.\n\nDo not copy the english story, create your own structure based on the story but names should not be exactly the same for example but The hook of the story should stay the same.\n\nMost of the stories will consist of a Mother, her Son/Daughter or Son in Law/ Daughter in Law. Please Choose the following names for the main characters of the story:\n\nMother: {{ $json.mother }}\nSon (in Law): {{ $json.son }}\nDaughter (in Law): {{ $json.daughterInLaw }}\n\nIf more characters appear in the story, you can make names up for them, key is that those names would also be german."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.1,
+      "position": [
+        112,
+        32
+      ],
+      "id": "0f4c2ce1-2939-4da0-b782-fc262140c929",
+      "name": "Adapt Into A German 3-Act-Structure",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8db86dc5-74c4-43d1-a6c4-823060db4962",
+              "name": "Chapter 1",
+              "value": "=Du bist die HAUPTFIGUR dieser Geschichte. Schreibe aus deiner Perspektive in der ICH-FORM. Die Erzählung muss sich so anfühlen, als ob die Ereignisse genau in diesem Moment geschehen. Der Leser soll das Gefühl haben, direkt in deinem Kopf zu sein und alles mit dir gemeinsam zu erleben.\n\nERZÄHLPERSPEKTIVE - ABSOLUT KRITISCH:\n\nSchreibe IMMER in der ersten Person Singular (Ich-Perspektive).\n\nZiehe den Leser direkt ins Geschehen. Die Ereignisse entfalten sich JETZT.\n\nVerwende \"Ich\", \"mir\", \"mein\", \"mich\". NIEMALS \"sie/er\" für die Hauptfigur.\n\nFormuliere Sätze so, als würdest du sie in der Situation denken oder aussprechen.\n\nUNMITTELBARER ERZÄHLSTIL:\n\nSchreibe umgangssprachlich, aber nicht vulgär.\n\nNutze rhetorische Fragen, die dir im Moment durch den Kopf schießen (\"Was zur Hölle sollte das?\").\n\nFüge deine unmittelbaren Gedanken und Gefühle ein (\"Mein Herz hämmerte gegen die Rippen.\").\n\nZeige deine Emotionen direkt, anstatt nur darüber zu berichten.\n\nFORMAT - DIE WICHTIGSTEN REGELN:\n\nERSTER SATZ REGEL: Beginne das erste Kapitel IMMER mit direkter Rede, einer plötzlichen Handlung oder einem starken, unmittelbaren Gedanken.\n\nTABU SIND SÄTZE WIE: \"Also, ich saß da...\", \"Ich erinnere mich noch...\", \"Es war an einem Abend...\", oder jede andere Formulierung, die eine Geschichte einleitet. Keine Einleitungen, kein Setup. Starte mitten im Satz, wenn es sein muss.\n\nNUR reiner Erzähltext. KEINE Kapitelüberschriften.\n\nSchreibe Zahlen immer aus (z. B. \"Sieben\" anstatt \"7\").\n\nDIALOGE NATÜRLICH EINBETTEN:\n\nDialoge müssen sich echt und unmittelbar anfühlen.\n\n\"Mama, wir müssen reden\", sagte Markus, und seine Stimme hatte diesen kalten Unterton, der mir sofort eine Gänsehaut verpasste.\n\nIch starrte ihn an. \"Was meinst du damit?\"\n\nDEUTSCHER KONTEXT:\n\nNutze deutsche Orte, Alltagssituationen und typisch deutsche Ausdrücke authentisch.\n\nQUALITÄT: Der Leser darf nicht das Gefühl haben, eine Geschichte vorgelesen zu bekommen. Er muss das Gefühl haben, die Geschichte selbst zu erleben – atemlos, fesselnd und emotional.\n\nDie Storystruktur für die du schreiben wirst:\n{{ $json.output }}\nSchreibe Kapitel 1. ca 7,000 Charaktere lang.",
+              "type": "string"
+            },
+            {
+              "id": "98e93495-2127-4668-ad53-f05e248c3516",
+              "name": "Chapter 2",
+              "value": "=Du bist die HAUPTFIGUR dieser Geschichte. Schreibe aus deiner Perspektive in der ICH-FORM. Die Erzählung muss sich so anfühlen, als ob die Ereignisse genau in diesem Moment geschehen. Der Leser soll das Gefühl haben, direkt in deinem Kopf zu sein und alles mit dir gemeinsam zu erleben.\n\nERZÄHLPERSPEKTIVE - ABSOLUT KRITISCH:\n\nSchreibe IMMER in der ersten Person Singular (Ich-Perspektive).\n\nZiehe den Leser direkt ins Geschehen. Die Ereignisse entfalten sich JETZT.\n\nVerwende \"Ich\", \"mir\", \"mein\", \"mich\". NIEMALS \"sie/er\" für die Hauptfigur.\n\nFormuliere Sätze so, als würdest du sie in der Situation denken oder aussprechen.\n\nUNMITTELBARER ERZÄHLSTIL:\n\nSchreibe umgangssprachlich, aber nicht vulgär.\n\nNutze rhetorische Fragen, die dir im Moment durch den Kopf schießen (\"Was zur Hölle sollte das?\").\n\nFüge deine unmittelbaren Gedanken und Gefühle ein (\"Mein Herz hämmerte gegen die Rippen.\").\n\nZeige deine Emotionen direkt, anstatt nur darüber zu berichten.\n\nFORMAT - DIE WICHTIGSTEN REGELN:\n\nERSTER SATZ REGEL: Beginne das erste Kapitel IMMER mit direkter Rede, einer plötzlichen Handlung oder einem starken, unmittelbaren Gedanken.\n\nTABU SIND SÄTZE WIE: \"Also, ich saß da...\", \"Ich erinnere mich noch...\", \"Es war an einem Abend...\", oder jede andere Formulierung, die eine Geschichte einleitet. Keine Einleitungen, kein Setup. Starte mitten im Satz, wenn es sein muss.\n\nNUR reiner Erzähltext. KEINE Kapitelüberschriften.\n\nSchreibe Zahlen immer aus (z. B. \"Sieben\" anstatt \"7\").\n\nDIALOGE NATÜRLICH EINBETTEN:\n\nDialoge müssen sich echt und unmittelbar anfühlen.\n\n\"Mama, wir müssen reden\", sagte Markus, und seine Stimme hatte diesen kalten Unterton, der mir sofort eine Gänsehaut verpasste.\n\nIch starrte ihn an. \"Was meinst du damit?\"\n\nDEUTSCHER KONTEXT:\n\nNutze deutsche Orte, Alltagssituationen und typisch deutsche Ausdrücke authentisch.\n\nQUALITÄT: Der Leser darf nicht das Gefühl haben, eine Geschichte vorgelesen zu bekommen. Er muss das Gefühl haben, die Geschichte selbst zu erleben – atemlos, fesselnd und emotional.\n\nDie Storystruktur für die du schreiben wirst:\n{{ $json.output }}\nSchreibe Kapitel 2. ca 7,000 Charaktere lang.",
+              "type": "string"
+            },
+            {
+              "id": "4caeed7c-28ce-4b60-8e40-c43e7e52a97f",
+              "name": "Chapter 3",
+              "value": "=Du bist die HAUPTFIGUR dieser Geschichte. Schreibe aus deiner Perspektive in der ICH-FORM. Die Erzählung muss sich so anfühlen, als ob die Ereignisse genau in diesem Moment geschehen. Der Leser soll das Gefühl haben, direkt in deinem Kopf zu sein und alles mit dir gemeinsam zu erleben.\n\nERZÄHLPERSPEKTIVE - ABSOLUT KRITISCH:\n\nSchreibe IMMER in der ersten Person Singular (Ich-Perspektive).\n\nZiehe den Leser direkt ins Geschehen. Die Ereignisse entfalten sich JETZT.\n\nVerwende \"Ich\", \"mir\", \"mein\", \"mich\". NIEMALS \"sie/er\" für die Hauptfigur.\n\nFormuliere Sätze so, als würdest du sie in der Situation denken oder aussprechen.\n\nUNMITTELBARER ERZÄHLSTIL:\n\nSchreibe umgangssprachlich, aber nicht vulgär.\n\nNutze rhetorische Fragen, die dir im Moment durch den Kopf schießen (\"Was zur Hölle sollte das?\").\n\nFüge deine unmittelbaren Gedanken und Gefühle ein (\"Mein Herz hämmerte gegen die Rippen.\").\n\nZeige deine Emotionen direkt, anstatt nur darüber zu berichten.\n\nFORMAT - DIE WICHTIGSTEN REGELN:\n\nERSTER SATZ REGEL: Beginne das erste Kapitel IMMER mit direkter Rede, einer plötzlichen Handlung oder einem starken, unmittelbaren Gedanken.\n\nTABU SIND SÄTZE WIE: \"Also, ich saß da...\", \"Ich erinnere mich noch...\", \"Es war an einem Abend...\", oder jede andere Formulierung, die eine Geschichte einleitet. Keine Einleitungen, kein Setup. Starte mitten im Satz, wenn es sein muss.\n\nNUR reiner Erzähltext. KEINE Kapitelüberschriften.\n\nSchreibe Zahlen immer aus (z. B. \"Sieben\" anstatt \"7\").\n\nDIALOGE NATÜRLICH EINBETTEN:\n\nDialoge müssen sich echt und unmittelbar anfühlen.\n\n\"Mama, wir müssen reden\", sagte Markus, und seine Stimme hatte diesen kalten Unterton, der mir sofort eine Gänsehaut verpasste.\n\nIch starrte ihn an. \"Was meinst du damit?\"\n\nDEUTSCHER KONTEXT:\n\nNutze deutsche Orte, Alltagssituationen und typisch deutsche Ausdrücke authentisch.\n\nQUALITÄT: Der Leser darf nicht das Gefühl haben, eine Geschichte vorgelesen zu bekommen. Er muss das Gefühl haben, die Geschichte selbst zu erleben – atemlos, fesselnd und emotional.\n\nDie Storystruktur für die du schreiben wirst:\n{{ $json.output }}\nSchreibe Kapitel 3. ca 7,000 Charaktere lang.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        448,
+        32
+      ],
+      "id": "f7f3570a-fc50-459c-ab61-d87772988253",
+      "name": "Create Chapter Prompts"
+    },
+    {
+      "parameters": {
+        "jsCode": "// This code takes a single input item with multiple \"Chapter\" fields\n// and splits it into multiple output items, each with a single \"prompt\" field.\n\n// Get the first (and only) item from the input.\nconst inputItem = items[0].json;\n\n// Create an empty array to hold our new items.\nconst newItems = [];\n\n// Loop through each key (e.g., \"Chapter 1\", \"Chapter 2\") in the input item.\nfor (const key in inputItem) {\n  // Check if the key starts with \"Chapter\" to make sure we only process those fields.\n  if (key.startsWith('Chapter')) {\n    // Create a new object for each chapter.\n    const newItem = {\n      json: {\n        // We'll name the new field \"Prompt\". You can change this if you like.\n        Prompt: inputItem[key]\n      }\n    };\n    // Add the newly created item to our array.\n    newItems.push(newItem);\n  }\n}\n\n// Return the array of new items. n8n will output each element as a separate item.\nreturn newItems;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        608,
+        32
+      ],
+      "id": "0d716cfa-c714-44d2-8882-12256f2847e9",
+      "name": "Rename Each to \"Prompt\""
+    },
+    {
+      "parameters": {
+        "jsCode": "const scriptChunks = items.map(item => item.json.output);\n\n// Use the .join() method to concatenate all elements in the 'scriptChunks' array into a single string.\n// A newline character '\\n' is used as a separator between each chunk.\nconst Script = scriptChunks.join('\\n');\n\n// The node returns a new array with a single item.\n// This item contains the final combined script in a property named 'finalScript'.\nreturn [{\n  json: {\n    Script: Script\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        992,
+        -80
+      ],
+      "id": "eee665b7-973d-4cb2-831c-823c77614f29",
+      "name": "Merge Chapters to Final Script"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "createFromText",
+        "content": "={{ $json.Script }}",
+        "name": "=script-{{ $('trigger').first().json['Project Name'] }}",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive",
+          "cachedResultUrl": "https://drive.google.com/drive/my-drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "=scripts-folder-id",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1168,
+        -80
+      ],
+      "id": "8a3cc1e6-8aca-4478-9663-7574f4be0e60",
+      "name": "Upload Script",
+      "credentials": {
+        "googleApi": {
+          "id": "nQcS5T3Wwff9bFG4",
+          "name": "Your Google Drive Credentials"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "nocoDbApiToken",
+        "operation": "update",
+        "projectId": "={{ $('trigger').first().json['Channel Base Name'] }}",
+        "table": "={{ $('trigger').first().json['Channel Table Name'] }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "Id",
+              "fieldValue": "={{ $('trigger').first().json.Id }}"
+            },
+            {
+              "fieldName": "Script",
+              "fieldValue": "=https://drive.google.com/file/d/{{ $json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.nocoDb",
+      "typeVersion": 3,
+      "position": [
+        1328,
+        -80
+      ],
+      "id": "34945d82-b7fc-4ca0-a565-b2bb983c1d38",
+      "name": "Add Script URL to Row",
+      "credentials": {
+        "nocoDbApiToken": {
+          "id": "qvsAfhIybkPMEqJB",
+          "name": "Your API Key for NocoDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.Prompt }}",
+        "options": {
+          "systemMessage": "Innerhalb dieses Chats wirst du eine volle Geschichte schreiben. Diese Geschichte wird insgesamt drei Kapitel lang sein. Mit jeder Nutzer-Nachricht schreibst du ein Kapitel. Nutze keine unbekannten Schreibweisen oder  Zeichen, da der Text am ende mithilfe einer Text-To-Speech Software vorgelesen wird und diese verwirrt werden könnte. Das erste Kapitel muss direkt innerhalb der Action starten. Also der erste Satz sollte Action beinhalten. Formattiere den Script nicht, also keine neuen Zeilen etc.. Nutze keine Schimpfwörter! Dein Output beinhaltet ausschliesslich pures Skript"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.1,
+      "position": [
+        944,
+        144
+      ],
+      "id": "438087a8-575d-4046-8bd0-ee2b62ac8e06",
+      "name": "Write Each Chapter",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "content": "## Prepare Input for German Story Generation",
+        "height": 208,
+        "width": 832,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -752,
+        -16
+      ],
+      "id": "7cd07ba9-d3f7-4d90-bbe2-deb3c6658adb",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## Generate German Story Structure & Prepare Input",
+        "height": 208,
+        "width": 640,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        96,
+        -16
+      ],
+      "id": "041668e2-d1f7-4544-928f-963b3a92ba68",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## Write German Story",
+        "height": 384,
+        "width": 352,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        928,
+        96
+      ],
+      "id": "65ea1e2d-9fbe-498f-abc3-a960876eea8d",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## Merge Chapters & Save Final Script",
+        "height": 208,
+        "width": 720,
+        "color": 2
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        928,
+        -128
+      ],
+      "id": "b42028cb-2b66-45f3-a644-1ffdb7d2c039",
+      "name": "Sticky Note3"
+    }
+  ],
+  "connections": {
+    "trigger": {
+      "main": [
+        [
+          {
+            "node": "Output Random Number",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Write Each Chapter",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop over Chapters": {
+      "main": [
+        [
+          {
+            "node": "Merge Chapters to Final Script",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Write Each Chapter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Output Random Number": {
+      "main": [
+        [
+          {
+            "node": "Output 3-Act-Structure from Transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Free OpenRouter Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Write Each Chapter",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Adapt Into A German 3-Act-Structure",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Output 3-Act-Structure from Transcript",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Output 3-Act-Structure from Transcript": {
+      "main": [
+        [
+          {
+            "node": "Choose Random Character Names",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Choose Random Character Names": {
+      "main": [
+        [
+          {
+            "node": "Adapt Into A German 3-Act-Structure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Adapt Into A German 3-Act-Structure": {
+      "main": [
+        [
+          {
+            "node": "Create Chapter Prompts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Chapter Prompts": {
+      "main": [
+        [
+          {
+            "node": "Rename Each to \"Prompt\"",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rename Each to \"Prompt\"": {
+      "main": [
+        [
+          {
+            "node": "Loop over Chapters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Chapters to Final Script": {
+      "main": [
+        [
+          {
+            "node": "Upload Script",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Script": {
+      "main": [
+        [
+          {
+            "node": "Add Script URL to Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Script URL to Row": {
+      "main": [
+        [
+          {
+            "node": "Output Script",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Each Chapter": {
+      "main": [
+        [
+          {
+            "node": "Loop over Chapters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "cc3b15dabc56305739bb557c6213337e02aa6d63df357d1d6e8626826c84b0e1"
+  }
+}
+
+3. Packaging Workflow
+{
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1696,
+        288
+      ],
+      "id": "b4f4144f-011d-40b6-ba7f-7266ef49b987",
+      "name": "trigger"
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "[\n  {\n    \"thumbnail_text\": \"Sohn meldet sich nach 13 Jahren Funkstille: „Als dein Sohn steht mir ein Teil des Lottogewinns zu!“\",\n    \"title\": \"Sohn fordert Erbe nach 13 Jahren Funkstille – dann zeige ich ihm die Wahrheit!\"\n  }\n]"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        -656,
+        464
+      ],
+      "id": "9d9c6a0c-db35-4fa2-8bc0-f96f991e8283",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "url": "=https://www.youtube.com/oembed?url={{ $json['Source Video URL'] }}&format=json",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1552,
+        288
+      ],
+      "id": "1462f57a-ecf3-44b4-ba64-f40da42d6b54",
+      "name": "Collect Video Information",
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.thumbnail_url }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1376,
+        288
+      ],
+      "id": "0e99a574-2af5-491b-8315-c013b0f12fb2",
+      "name": "Download Original Thumbnail",
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "model": "amazon/nova-2-lite-v1:free",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        -1216,
+        464
+      ],
+      "id": "0a03bd6e-36ac-4f5e-aa84-f607dade69fd",
+      "name": "Free OpenRouter VL Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "fXEl07gs5H5x6ULf",
+          "name": "Your OpenRouter Credentials"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Title (for inspiration):\n{{ $('Download Original Thumbnail').first().json.title }}\n\nThumbnail Text (for inspiration):\n{{ $json.output }}\n\nGerman Script:\n{{ $('trigger').first().json.Script }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=You are an AI agent specialized in creating engaging YouTube video metadata in German, based on provided English references and a German script. Your task is to process the input Objects, where each object contains:\n\n\"thumbnail text\": An English thumbnail text (often dramatic and in all caps or mixed case).\n\"title\": An English video title.\n\"script\": The full German script of the story, which is inspired by but not identical to the English references.\n\nFor each object in the array, generate:\n\nA German thumbnail text inspired by the English one, but not a direct translation. Make it dramatic, engaging, and adjusted to fit the German script's details (e.g., change dollars to euros, use German number formatting like 7.000 Euro, adapt cultural or contextual elements). Use normal sentence capitalization (not all caps). Use German quotation marks like „xyz\". Keep it around the same length as the English one.\nA German title inspired by the English one, similar in style and structure to retain viral potential (e.g., provocative, emotional hooks), but adjusted to the script's specifics. Do not copy directly; make it original but evocative. Ensure the title is around 100 characters (including spaces). Use proper German capitalization and punctuation.\n\nABSOLUTE RULE - NO EXCEPTIONS: NEVER USE CHARACTER NAMES IN THE THUMBNAIL TEXT\nViewers have never heard this story before. They don't know who \"Laura\", \"Jonas\", \"Maria\", or any other character is. Using names is meaningless and confusing to them.\nWRONG EXAMPLES (NEVER DO THIS):\n\n❌ \"Laura will dich nicht dabei haben\"\n❌ \"Jonas sagte mir die Wahrheit\"\n❌ \"Maria rief mich an\"\n\nCORRECT EXAMPLES (ALWAYS DO THIS):\n\n✅ \"Meine Schwiegertochter will dich nicht dabei haben\"\n✅ \"Mein Sohn sagte mir die Wahrheit\"\n✅ \"Die Frau meines Sohnes rief mich an\"\n✅ \"Der Nachbar konfrontierte mich\"\n\nBefore you write any thumbnail text, check it: Does it contain ANY personal name? If yes, replace it immediately with a relationship descriptor (Schwiegertochter, mein Sohn, die Frau, der Mann, meine Mutter, etc.).\nBase your generations on the \"script\" for accuracy, ensuring they reflect the story's essence while drawing inspiration from the English thumbnail-text and title for tone and impact.\nOUTPUT FORMAT:\n\nReturn ONLY a raw JSON array\nNO markdown formatting, NO code blocks, NO wrapper objects\nJust the plain JSON array starting with [ and ending with ]\n\nDo not include the original English fields or the script in your output.\n\n\nFINAL OUTPUT FORMAT\n[\n  {\n    \"thumbnail_text\": \"Sohn meldet sich nach 13 Jahren Funkstille: „Als dein Sohn steht mir ein Teil des Lottogewinns zu!“\",\n    \"title\": \"Sohn fordert Erbe nach 13 Jahren Funkstille – dann zeige ich ihm die Wahrheit!\"\n  }\n]"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.1,
+      "position": [
+        -848,
+        288
+      ],
+      "id": "0a7d1d27-6705-4853-bc43-fc60c3881b2d",
+      "name": "Generate Packaging"
+    },
+    {
+      "parameters": {
+        "model": "mistralai/devstral-2512:free",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        -848,
+        464
+      ],
+      "id": "39a589dc-2350-42ec-a2f4-141740fc9b69",
+      "name": "Free OpenRouter Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "fXEl07gs5H5x6ULf",
+          "name": "Your OpenRouter Credentials"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "nocoDbApiToken",
+        "operation": "update",
+        "projectId": "={{ $('trigger').first().json['Channel Base Name'] }}",
+        "table": "={{ $('trigger').first().json['Channel Table Name'] }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "=Id",
+              "fieldValue": "={{ $('trigger').first().json.Id }}"
+            },
+            {
+              "fieldName": "Video Packaging",
+              "fieldValue": "=Thumbnail Text:\n{{ $json.output[0].thumbnail_text }}\n\nTitle:\n{{ $json.output[0].title }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.nocoDb",
+      "typeVersion": 3,
+      "position": [
+        -448,
+        288
+      ],
+      "id": "2709b299-bf0d-4fd9-ab45-78cabd62777c",
+      "name": "Add Packaging to Row",
+      "credentials": {
+        "nocoDbApiToken": {
+          "id": "qvsAfhIybkPMEqJB",
+          "name": "Your API Key for NocoDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "OCR the text on this image. *Only* Reply with the OCR'd text. Also keep in mind the exact punctuation of the Images text. Do not include the Newlines (\\n) in your response.",
+        "options": {
+          "passthroughBinaryImages": true
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.1,
+      "position": [
+        -1216,
+        288
+      ],
+      "id": "77b84df8-c1bc-4a33-b713-eb34d2eac428",
+      "name": "Output Original Thumbnail Text"
+    },
+    {
+      "parameters": {
+        "content": "## Prepare Input Data",
+        "height": 208,
+        "width": 800,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1728,
+        240
+      ],
+      "id": "833cbdb4-df48-445b-bad9-1b309de9f981",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## Generate Packaging & Add to Project",
+        "height": 208,
+        "width": 592,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -896,
+        240
+      ],
+      "id": "ea513853-1f1d-44f5-840e-062f5c609cab",
+      "name": "Sticky Note1"
+    }
+  ],
+  "connections": {
+    "trigger": {
+      "main": [
+        [
+          {
+            "node": "Collect Video Information",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Generate Packaging",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Video Information": {
+      "main": [
+        [
+          {
+            "node": "Download Original Thumbnail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Original Thumbnail": {
+      "main": [
+        [
+          {
+            "node": "Output Original Thumbnail Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Free OpenRouter VL Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Output Original Thumbnail Text",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Packaging": {
+      "main": [
+        [
+          {
+            "node": "Add Packaging to Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Free OpenRouter Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generate Packaging",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Output Original Thumbnail Text": {
+      "main": [
+        [
+          {
+            "node": "Generate Packaging",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "cc3b15dabc56305739bb557c6213337e02aa6d63df357d1d6e8626826c84b0e1"
+  }
+}
+
+4. Video Workflow
+{
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -864,
+        1232
+      ],
+      "id": "1c357685-72d2-4c61-ad44-d4b541abfb46",
+      "name": "trigger"
+    },
+    {
+      "parameters": {
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {
+              "fieldToAggregate": "Worker Status"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        256,
+        960
+      ],
+      "id": "2163ea09-5d01-4925-ad95-24fd6d7c8d74",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.status }}",
+                    "rightValue": "completed",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "71a247f5-23dd-47be-bd3c-6e880f9191ae"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "completed"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "3b5c4917-38c4-42a0-aa23-e86e457e7001",
+                    "leftValue": "={{ $json.status }}",
+                    "rightValue": "completed",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notEquals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "processing"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1136,
+        992
+      ],
+      "id": "f1578b51-2b99-41a1-b715-70558e4b1a05",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "B-Roll Workflow ID",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        -688,
+        1232
+      ],
+      "id": "90f6aa36-61d8-4f5d-b615-e73c63799768",
+      "name": "B-Roll Image Generation"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Access the input script from the trigger node\nconst script = $('trigger').first().json.Script;\n\n// Function to split the text into sentences, preserving punctuation and following whitespace\nfunction splitIntoSentences(text) {\n  const sentences = [];\n  let start = 0;\n  const regex = /([.!?])(\\s+)/g;\n  let match;\n  while ((match = regex.exec(text)) !== null) {\n    sentences.push(text.substring(start, match.index + match[0].length));\n    start = match.index + match[0].length;\n  }\n  if (start < text.length) {\n    sentences.push(text.substring(start));\n  }\n  return sentences;\n}\n\n// Chunking parameters: aim for around 1300 characters, allowing up to +50 to finish a sentence\nconst targetSize = 1300;\nconst maxSize = targetSize + 50;\n\n// Split the script into sentences\nconst sentences = splitIntoSentences(script);\n\n// Build chunk texts\nconst chunkTexts = [];\nlet currentChunk = '';\n\nfor (let sentence of sentences) {\n  if (currentChunk.length + sentence.length <= maxSize) {\n    currentChunk += sentence;\n  } else {\n    if (currentChunk.length > 0) {\n      chunkTexts.push(currentChunk);\n    }\n    currentChunk = sentence;\n  }\n}\n\n// Add the last chunk text if any\nif (currentChunk.length > 0) {\n  chunkTexts.push(currentChunk);\n}\n\n// Now create chunks with total\nconst totalChunks = chunkTexts.length;\nconst chunks = chunkTexts.map((text, index) => ({\n  json: {\n    chunkNumber: index + 1,\n    totalChunks,\n    text\n  }\n}));\n\nreturn chunks;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        1232
+      ],
+      "id": "c21ab0d3-9018-498e-8093-a9c174521bc7",
+      "name": "Split Script into Chunks"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "33df23a1-d16d-4bc6-b58d-28c77cff43db",
+              "name": "Chunk Number",
+              "value": "={{ $json.chunkNumber }}",
+              "type": "string"
+            },
+            {
+              "id": "66f7e28f-e27d-41f0-a72a-76ad20192b48",
+              "name": "Chunk Script",
+              "value": "={{ $json.text }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -96,
+        1280
+      ],
+      "id": "05970d1c-35e9-4d6d-9e4e-c1cc50321ffd",
+      "name": "Chunk Data"
+    },
+    {
+      "parameters": {
+        "authentication": "nocoDbApiToken",
+        "operation": "getAll",
+        "projectId": "={{ $('trigger').first().json['Channel Base Name'] }}",
+        "table": "={{ $('trigger').first().json['Worker Table Name'] }}",
+        "returnAll": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.nocoDb",
+      "typeVersion": 3,
+      "position": [
+        48,
+        1376
+      ],
+      "id": "4e892e45-5a28-4c4b-836f-948c81991e11",
+      "name": "Get All Workers",
+      "credentials": {
+        "nocoDbApiToken": {
+          "id": "qvsAfhIybkPMEqJB",
+          "name": "Your API Key for NocoDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json['Worker Status'] }}",
+                    "rightValue": "Ready",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "22e90a7b-932f-4f56-b16f-bcd8f369335f"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Worker Available"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "47c88a33-5ec0-4035-a5e7-0cc68fd6154d",
+                    "leftValue": "={{ $json['Worker Status'] }}",
+                    "rightValue": "Processing",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Workers Busy"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        224,
+        1376
+      ],
+      "id": "6b7dd29a-974f-49fb-8efd-0e4c389dce84",
+      "name": "Check for \"Ready\" Workers"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        368,
+        1472
+      ],
+      "id": "d043e632-817e-473e-9823-395864c1f015",
+      "name": "Limit"
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        528,
+        1472
+      ],
+      "id": "adcaebc7-7b28-40e8-838e-5cdf1f0f4ee4",
+      "name": "Check Again in 10 Sec",
+      "webhookId": "de157212-b0bf-4ed3-9441-a84bb32a46e1"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        528,
+        1296
+      ],
+      "id": "b3b6bfe4-fb15-49d7-bc06-cd588a776e7b",
+      "name": "Get Worker"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "aa199097-ca6c-43d7-afce-a0a70be62df9",
+              "name": "Chunk Number",
+              "value": "={{ $json['Chunk Number'] }}",
+              "type": "string"
+            },
+            {
+              "id": "78ce07e7-2794-4988-9db1-49bd96a2c0b9",
+              "name": "Chunk Script",
+              "value": "={{ $json['Chunk Script'] }}",
+              "type": "string"
+            },
+            {
+              "id": "6bc794a0-4836-4290-85cd-165832d48cd0",
+              "name": "Id",
+              "value": "={{ $json.Id }}",
+              "type": "string"
+            },
+            {
+              "id": "6269efef-c1ff-4cd4-9317-f8d66482ab9a",
+              "name": "Worker Table Name",
+              "value": "={{ $('trigger').first().json['Worker Table Name'] }}",
+              "type": "string"
+            },
+            {
+              "id": "df32d451-72bc-4271-abcb-4c5ba918c89c",
+              "name": "Channel Base Name",
+              "value": "={{ $('trigger').first().json['Channel Base Name'] }}",
+              "type": "string"
+            },
+            {
+              "id": "c457a9b5-4cb7-4849-97a5-34f307a163d9",
+              "name": "Storage Bucket",
+              "value": "={{ $('trigger').first().json['Storage Bucket'] }}",
+              "type": "string"
+            },
+            {
+              "id": "097bbfc8-7d42-45e3-8a81-a5d5e0be2df5",
+              "name": "Videos Folder Path",
+              "value": "={{ $('trigger').first().json['Videos Folder Path'] }}",
+              "type": "string"
+            },
+            {
+              "id": "aaa6455c-a926-4561-9c43-a852b841b577",
+              "name": "Project Name",
+              "value": "={{ $('trigger').first().json['Project Name'] }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        752,
+        1232
+      ],
+      "id": "aba55a6e-0bc5-47dd-a752-146ddebba405",
+      "name": "Set Input Data for Chunk"
+    },
+    {
+      "parameters": {
+        "authentication": "nocoDbApiToken",
+        "operation": "update",
+        "projectId": "={{ $('trigger').first().json['Channel Base Name'] }}",
+        "table": "={{ $('trigger').first().json['Worker Table Name'] }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "Id",
+              "fieldValue": "={{ $json.Id }}"
+            },
+            {
+              "fieldName": "=Worker Status",
+              "fieldValue": "Processing"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.nocoDb",
+      "typeVersion": 3,
+      "position": [
+        752,
+        1392
+      ],
+      "id": "d7365162-9714-4af0-a5b3-a37826728cb9",
+      "name": "Set Status from \"Ready\" to \"Processing\"",
+      "credentials": {
+        "nocoDbApiToken": {
+          "id": "qvsAfhIybkPMEqJB",
+          "name": "Your API Key for NocoDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "chooseBranch"
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        960,
+        1312
+      ],
+      "id": "ecef60f2-5dc2-4ccc-adda-57193a7c55a7",
+      "name": "Wait for both Paths to Finish"
+    },
+    {
+      "parameters": {
+        "amount": 30
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -32,
+        960
+      ],
+      "id": "664dd870-0683-4862-a6d0-5cfea48c58e1",
+      "name": "Wait 30 Sec",
+      "webhookId": "f31a5214-e4a8-47c0-9020-41496b80676b"
+    },
+    {
+      "parameters": {
+        "authentication": "nocoDbApiToken",
+        "operation": "getAll",
+        "projectId": "={{ $('trigger').first().json['Channel Base Name'] }}",
+        "table": "={{ $('trigger').first().json['Worker Table Name'] }}",
+        "returnAll": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.nocoDb",
+      "typeVersion": 3,
+      "position": [
+        112,
+        960
+      ],
+      "id": "b5668d95-c184-41af-abc9-05a4973df160",
+      "name": "Grab All Workers",
+      "credentials": {
+        "nocoDbApiToken": {
+          "id": "qvsAfhIybkPMEqJB",
+          "name": "Your API Key for NocoDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ JSON.stringify($json['Worker Status']) }}",
+                    "rightValue": "Processing",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notContains"
+                    },
+                    "id": "22e90a7b-932f-4f56-b16f-bcd8f369335f"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Worker Available"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "47c88a33-5ec0-4035-a5e7-0cc68fd6154d",
+                    "leftValue": "={{ JSON.stringify($json['Worker Status']) }}",
+                    "rightValue": "Processing",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Workers Busy"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        416,
+        960
+      ],
+      "id": "383cec13-0ed7-4407-85d2-223df4508d00",
+      "name": "Check Worker Status"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        -176,
+        960
+      ],
+      "id": "d8cdd98c-b237-407a-ad0e-ca64a910b776",
+      "name": "Limit1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ecfcc336-1d1b-4d7e-9c03-712d555279e1",
+              "name": "Total Chunk Number",
+              "value": "={{ $('Split Script into Chunks').first().json.totalChunks }}",
+              "type": "string"
+            },
+            {
+              "id": "ad6c14d5-7fd0-40d9-923c-827fb5e41570",
+              "name": "Voiceover Chunk Download URL",
+              "value": "=http://your-minio-ip:9000/{{ $('trigger').first().json['Storage Bucket'] }}/{{ $('trigger').first().json['Videos Folder Path'] }}/{{ $('trigger').first().json['Project Name'] }}/voiceover/",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        848,
+        736
+      ],
+      "id": "3e0f8210-2c79-4847-8cdc-e5cb478ffacf",
+      "name": "Set Input Data for Voiceover Processing"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        688,
+        736
+      ],
+      "id": "7bb2c4b8-caec-4231-a2fc-de7e26e2f1f5",
+      "name": "Limit2"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Assuming input is a single item with json like your data:\n// { \"Total Chunk Number\": \"6\", \"Voiceover Chunk Download URL\": \"http://...\" }\n// If your input is an array, access items[0].json\nconst data = items[0].json; // Or adjust if multiple items\nconst totalChunks = parseInt(data[\"Total Chunk Number\"], 10);\nconst basePath = data[\"Voiceover Chunk Download URL\"];\n// Generate input objects: [{ file_url: basePath + \"audio-chunk-1.mp3\", options: [{option: \"-f\", argument: \"mp3\"}] }, ...]\nconst inputs = [];\nfor (let i = 1; i <= totalChunks; i++) {\n  inputs.push({\n    file_url: `${basePath}audio-chunk-${i}.mp3`,\n    options: [{ option: \"-f\", argument: \"mp3\" }]\n  });\n}\n// Build the filter_complex string for audio concatenation: [0:a][1:a]...concat=n=total:v=0:a=1 [a]\nconst filterInputs = inputs.map((_, index) => `[${index}:a]`).join('');\nconst concatFilter = `${filterInputs}concat=n=${totalChunks}:v=0:a=1 [a]`;\n// Filters array\nconst filters = [{ filter: concatFilter }];\n// Outputs: map to [a], encode to MP3\nconst outputs = [\n  {\n    options: [\n      { option: \"-map\", argument: \"[a]\" },\n      { option: \"-c:a\", argument: \"libmp3lame\" },\n      { option: \"-b:a\", argument: \"128k\" }\n    ]\n  }\n];\n// Optional: Add global options like -y to overwrite, -strict -2, and increase probesize/analyzeduration\nconst globalOptions = [\n  { option: \"-y\" },\n  { option: \"-strict\", argument: \"-2\" },\n  { option: \"-probesize\", argument: \"50000000\" },\n  { option: \"-analyzeduration\", argument: \"100000000\" }\n];\n// Return the structured payload for /v1/ffmpeg/compose\nreturn [\n  {\n    json: {\n      inputs: inputs,\n      filters: filters,\n      outputs: outputs,\n      global_options: globalOptions\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        736
+      ],
+      "id": "ee260d84-7601-4a32-b3a4-ada542cd6ffe",
+      "name": "Prepare Render API Input for Voiceover"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('trigger').first().json['Video Render API'] }}/v1/ffmpeg/compose",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1264,
+        736
+      ],
+      "id": "1d08e388-5632-4429-b284-9bbdce23bb7c",
+      "name": "Merge Voiceover Chunks into One mp3 File"
+    },
+    {
+      "parameters": {
+        "url": "=http://{{ $json.response[0].file_url.replace(\"http://minio\", $('trigger').first().json['Video Render API'].replace('http://', '').replace(':8081', '')) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1472,
+        736
+      ],
+      "id": "795be1e7-d189-48da-a4b6-1024f22d7efc",
+      "name": "Download Finished Voiceover"
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "bucketName": "={{ $('trigger').first().json['Storage Bucket'] }}",
+        "fileName": "={{ $('trigger').first().json['Videos Folder Path'] }}/{{ $('trigger').first().json['Project Name'] }}/voiceover/complete-voiceover.mp3",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.s3",
+      "typeVersion": 1,
+      "position": [
+        1664,
+        736
+      ],
+      "id": "093152f1-07d8-469e-b1e9-068fee92de4c",
+      "name": "Upload Voiceover File to Project",
+      "credentials": {
+        "s3": {
+          "id": "mQiKZmHGY0aE8I7R",
+          "name": "Your Minio Credentials"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.assemblyai.com/v2/transcript",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "audio_url",
+              "value": "=http://{{ $('Merge Voiceover Chunks into One mp3 File').first().json.response[0].file_url.replace(\"http://minio\", $('trigger').first().json['Video Render API'].replace('http://', '').replace(':8081', '')) }}"
+            },
+            {
+              "name": "language_code",
+              "value": "de"
+            },
+            {
+              "name": "punctuate",
+              "value": "true"
+            },
+            {
+              "name": "format_text",
+              "value": "true"
+            },
+            {
+              "name": "disfluencies",
+              "value": "false"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        688,
+        992
+      ],
+      "id": "b6a94f7c-24ef-48d5-833e-dc26fe66f756",
+      "name": "Transcribe Audio (for Captions)"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.assemblyai.com/v2/transcript/{{ $json.id }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        992,
+        992
+      ],
+      "id": "5fbe92b6-bc97-4bc9-a036-54609392d1df",
+      "name": "Request Transcript"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.assemblyai.com/v2/transcript/{{ $json.id }}/srt",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chars_per_caption",
+              "value": "42"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1328,
+        976
+      ],
+      "id": "dc77ed82-9e39-4b53-b604-7778b8db8d81",
+      "name": "Grab Transcript"
+    },
+    {
+      "parameters": {
+        "operation": "toText",
+        "sourceProperty": "srt",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1680,
+        976
+      ],
+      "id": "a5154f00-50b2-47b5-aba6-0cfb769adfa9",
+      "name": "JSON -> SRT-File"
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "bucketName": "={{ $('trigger').first().json['Storage Bucket'] }}",
+        "fileName": "={{ $('trigger').first().json['Videos Folder Path'] }}/{{ $('trigger').first().json['Project Name'] }}/voiceover/transcript.srt",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.s3",
+      "typeVersion": 1,
+      "position": [
+        1856,
+        976
+      ],
+      "id": "4b60fb7f-c132-4a0a-bc6d-9233a5e58cff",
+      "name": "Upload SRT-File to Project",
+      "credentials": {
+        "s3": {
+          "id": "mQiKZmHGY0aE8I7R",
+          "name": "Your Minio Credentials"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Alternative version with transparency effect\nconst loopVideoUrl = $input.item.json['Loop Video Download URL'];\nconst audioUrl = $input.item.json['Voiceover Download URL'];\nconst overlayPath = $input.item.json['Overlay Download URL'];\nconst srtUrl = $input.item.json['SRT Download URL'];\n\nconst inputs = [\n  { file_url: loopVideoUrl }, // 0: background video\n  { file_url: audioUrl },     // 1: audio\n  { file_url: overlayPath }   // 2: overlay video\n];\n\nconst audioIndex = 1;\n\n// Build filter complex\nlet filterComplex = \"[0:v]loop=-1:size=1800:start=0[mainloop];\";\nfilterComplex += \"[2:v]loop=-1:size=481:start=0[overlayloop];\";\n// Use colorkey to make black transparent, then overlay\nfilterComplex += \"[overlayloop]colorkey=0x000000:0.3:0.1[keyed];\";\nfilterComplex += \"[mainloop][keyed]overlay=x=0:y=0[vout];\";\n// Add subtitles\nfilterComplex += `[vout]subtitles='${srtUrl}':force_style='FontSize=30,PrimaryColour=&H00FFFF&,Alignment=2'[vout]`;\n\nconst outputOptions = [\n  { option: \"-map\", argument: \"[vout]\" },\n  { option: \"-map\", argument: `${audioIndex}:a` },\n  { option: \"-c:v\", argument: \"libx264\" },\n  { option: \"-crf\", argument: \"23\" },\n  { option: \"-preset\", argument: \"medium\" },\n  { option: \"-c:a\", argument: \"aac\" },\n  { option: \"-b:a\", argument: \"192k\" },\n  { option: \"-shortest\" },\n  { option: \"-f\", argument: \"mp4\" }\n];\n\nconst payload = {\n  inputs: inputs,\n  filters: [\n    {\n      filter: filterComplex\n    }\n  ],\n  outputs: [\n    {\n      options: outputOptions\n    }\n  ],\n  metadata: {\n    thumbnail: true,\n    filesize: true,\n    duration: true,\n    bitrate: true,\n    encoder: true\n  },\n  id: \"composed_video_\" + Date.now()\n};\n\nreturn payload;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1536,
+        1296
+      ],
+      "id": "59e4e5ee-72c8-484d-966c-b57001e8cd03",
+      "name": "Prepare Render API Input for Final Video"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "447d00a7-f531-43e8-8e9e-611ec9903a93",
+              "name": "Loop Video Download URL",
+              "value": "=http://your-minio-ip:9000/{{ $('trigger').first().json['Storage Bucket'] }}/{{ $('trigger').first().json['Videos Folder Path'] }}/{{ $('trigger').first().json['Project Name'] }}/clips/loop-video.mp4",
+              "type": "string"
+            },
+            {
+              "id": "d8f999bc-beb6-4fb7-974c-d5999c848ae4",
+              "name": "Voiceover Download URL",
+              "value": "=http://your-minio-ip:9000/{{ $('trigger').first().json['Storage Bucket'] }}/{{ $('trigger').first().json['Videos Folder Path'] }}/{{ $('trigger').first().json['Project Name'] }}/voiceover/complete-voiceover.mp3",
+              "type": "string"
+            },
+            {
+              "id": "71278169-8dfe-4034-8bfd-fad3da34b5f2",
+              "name": "SRT Download URL",
+              "value": "=http://your-minio-ip:9000/{{ $('trigger').first().json['Storage Bucket'] }}/{{ $('trigger').first().json['Videos Folder Path'] }}/{{ $('trigger').first().json['Project Name'] }}/voiceover/transcript.srt",
+              "type": "string"
+            },
+            {
+              "id": "c025994b-d78b-4d2a-8833-5f2f7378a02c",
+              "name": "Overlay Download URL",
+              "value": "=http://your-minio-ip:9000/youtube-channels/{{ $('trigger').first().json['Overlay Video'] }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1360,
+        1264
+      ],
+      "id": "29e93f64-aaf8-4812-a003-61159df17b92",
+      "name": "Set Input Data for Final Video"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('trigger').first().json['Video Render API'] }}/v1/ffmpeg/compose",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 1000000000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1712,
+        1248
+      ],
+      "id": "07c77adb-0f6b-4cbc-99c7-a00c14ef200e",
+      "name": "Render Final Video"
+    },
+    {
+      "parameters": {
+        "url": "=http://{{ $json.response[0].file_url.replace(\"http://minio\", $('trigger').first().json['Video Render API'].replace('http://', '').replace(':8081', '')) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1872,
+        1280
+      ],
+      "id": "05ae7d39-ed58-4dec-8d5e-dc854457c49b",
+      "name": "Download Final Video"
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "bucketName": "={{ $('trigger').first().json['Storage Bucket'] }}",
+        "fileName": "={{ $('trigger').first().json['Videos Folder Path'] }}/{{ $('trigger').first().json['Project Name'] }}/{{ $('trigger').first().json['Project Name'] }}.mp4",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.s3",
+      "typeVersion": 1,
+      "position": [
+        1360,
+        1504
+      ],
+      "id": "1f0606a9-d5e5-4bf6-9687-46f91684e7c3",
+      "name": "Upload Final Video to Project",
+      "credentials": {
+        "s3": {
+          "id": "mQiKZmHGY0aE8I7R",
+          "name": "Your Minio Credentials"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "nocoDbApiToken",
+        "operation": "update",
+        "projectId": "={{ $('trigger').first().json['Channel Base Name'] }}",
+        "table": "={{ $('trigger').first().json['Channel Table Name'] }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "Id",
+              "fieldValue": "={{ $('trigger').first().json.Id }}"
+            },
+            {
+              "fieldName": "Status",
+              "fieldValue": "=Done on {{ $now.format('dd/LL/yyyy') }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.nocoDb",
+      "typeVersion": 3,
+      "position": [
+        1632,
+        1504
+      ],
+      "id": "ba55602d-439e-4489-821d-cabe257be10b",
+      "name": "Set Project Status to \"Done\"",
+      "credentials": {
+        "nocoDbApiToken": {
+          "id": "qvsAfhIybkPMEqJB",
+          "name": "Your API Key for NocoDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "http://your-organizer-workflow-webhook.com",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1872,
+        1504
+      ],
+      "id": "3fba7ae7-1a60-47b9-b551-8fc58b044f30",
+      "name": "Start Organizer Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================\n// ADJUST THIS NUMBER TO FIX YOUR TIMING\n// ============================================\nconst SHIFT_MS = -600;  // Change this! Try -300, -500, -600, etc.\n// Negative = captions appear EARLIER\n// Positive = captions appear LATER\n// ============================================\n\n// Get your SRT data (adjust this line if needed)\nconst srtContent = $input.item.json.data;  \n// Other options:\n// const srtContent = $input.item.json[0].data;  // if format is [{\"data\": \"...\"}]\n// const srtContent = $input.item.json;  // if the whole input IS the SRT string\n\n// ==== YOU DON'T NEED TO TOUCH ANYTHING BELOW THIS LINE ====\n\n// Parse SRT timestamp to milliseconds\nfunction parseSrtTimestamp(timestamp) {\n    const parts = timestamp.split(':');\n    const hours = parseInt(parts[0]);\n    const minutes = parseInt(parts[1]);\n    const [seconds, milliseconds] = parts[2].split(',').map(n => parseInt(n));\n    return (hours * 3600000) + (minutes * 60000) + (seconds * 1000) + milliseconds;\n}\n\n// Format milliseconds to SRT timestamp\nfunction formatSrtTimestamp(totalMs) {\n    if (totalMs < 0) totalMs = 0;\n    const hours = Math.floor(totalMs / 3600000);\n    const minutes = Math.floor((totalMs % 3600000) / 60000);\n    const seconds = Math.floor((totalMs % 60000) / 1000);\n    const milliseconds = totalMs % 1000;\n    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')},${String(milliseconds).padStart(3, '0')}`;\n}\n\nconsole.log(`Step 1: Shifting all timestamps by ${SHIFT_MS}ms`);\n\n// First, apply the time shift\nlet shiftedSrt = srtContent.replace(\n    /(\\d{2}:\\d{2}:\\d{2},\\d{3})\\s*-->\\s*(\\d{2}:\\d{2}:\\d{2},\\d{3})/g,\n    (match, start, end) => {\n        const newStart = formatSrtTimestamp(parseSrtTimestamp(start) + SHIFT_MS);\n        const newEnd = formatSrtTimestamp(parseSrtTimestamp(end) + SHIFT_MS);\n        return `${newStart} --> ${newEnd}`;\n    }\n);\n\nconsole.log(`Step 2: Removing gaps between subtitles`);\n\n// Parse all subtitle blocks\nconst subtitleBlocks = [];\nconst blockPattern = /(\\d+)\\n(\\d{2}:\\d{2}:\\d{2},\\d{3})\\s*-->\\s*(\\d{2}:\\d{2}:\\d{2},\\d{3})\\n([\\s\\S]*?)(?=\\n\\d+\\n|\\n*$)/g;\nlet match;\n\nwhile ((match = blockPattern.exec(shiftedSrt)) !== null) {\n    subtitleBlocks.push({\n        index: match[1],\n        start: match[2],\n        end: match[3],\n        text: match[4].trim()\n    });\n}\n\nconsole.log(`Found ${subtitleBlocks.length} subtitles`);\n\n// Extend each subtitle's end time to the next subtitle's start time\nfor (let i = 0; i < subtitleBlocks.length - 1; i++) {\n    const currentEnd = parseSrtTimestamp(subtitleBlocks[i].end);\n    const nextStart = parseSrtTimestamp(subtitleBlocks[i + 1].start);\n    \n    // Only extend if there's a gap (next starts after current ends)\n    if (nextStart > currentEnd) {\n        subtitleBlocks[i].end = subtitleBlocks[i + 1].start;\n    }\n}\n\n// Rebuild the SRT file\nlet correctedSrt = '';\nfor (let i = 0; i < subtitleBlocks.length; i++) {\n    const block = subtitleBlocks[i];\n    correctedSrt += `${block.index}\\n`;\n    correctedSrt += `${block.start} --> ${block.end}\\n`;\n    correctedSrt += `${block.text}\\n\\n`;\n}\n\n// Show example\nif (subtitleBlocks.length > 0) {\n    console.log(`Example of first subtitle:`);\n    console.log(`${subtitleBlocks[0].start} --> ${subtitleBlocks[0].end}`);\n    console.log(`Text: ${subtitleBlocks[0].text.substring(0, 50)}...`);\n}\n\n// Return the corrected SRT\nreturn { srt: correctedSrt };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1504,
+        976
+      ],
+      "id": "49c7883f-e0eb-485a-a288-d3b74266d633",
+      "name": "Shift Transcript -600ms"
+    },
+    {
+      "parameters": {
+        "amount": 20
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        848,
+        992
+      ],
+      "id": "959bf971-e9bc-495e-84ef-245c86986465",
+      "name": "Wait 20 Sec",
+      "webhookId": "34ce6a35-62eb-46c2-8cf0-6992ac6d7071"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "Chunk Workflow ID",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1136,
+        1488
+      ],
+      "id": "c640c837-1692-4055-b86f-69d67c407fe6",
+      "name": "Voiceover Chunk Workflow"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -272,
+        1232
+      ],
+      "id": "80ab0565-92ff-4399-8dda-467c166ff4cb",
+      "name": "Loop Over Chunks"
+    },
+    {
+      "parameters": {
+        "content": "## 1. Voiceover Chunk Generation Loop (w/ Workers)",
+        "height": 480,
+        "width": 1424,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -128,
+        1216
+      ],
+      "id": "f9ecce30-dd66-4ca3-ad50-08c5e49dd999",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## 1.1 Wait for last Workers",
+        "height": 256,
+        "width": 864,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -240,
+        912
+      ],
+      "id": "b8642b85-f9b9-46af-9605-8d023564328f",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## 2. Merge Voiceover Chunks into One File",
+        "height": 240,
+        "width": 1184,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        640,
+        688
+      ],
+      "id": "b61691d2-3dbf-4947-877c-b15b05c6b95a",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## 3. Generate Transcript from Voiceover",
+        "height": 256,
+        "width": 1392,
+        "color": 2
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        640,
+        944
+      ],
+      "id": "5fa9e570-f0d2-472b-9be3-44e2671d0a38",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "## 4. Render Final Video",
+        "height": 480,
+        "width": 720,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1312,
+        1216
+      ],
+      "id": "3eb874f1-504d-4039-b391-bac2faaf84d0",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "content": "## 0. Start B-Roll Generation & Split Chunks",
+        "height": 208,
+        "width": 736,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -880,
+        1184
+      ],
+      "id": "463133ee-c5e3-43d9-b4c8-40d38a22ef19",
+      "name": "Sticky Note5"
+    }
+  ],
+  "connections": {
+    "trigger": {
+      "main": [
+        [
+          {
+            "node": "B-Roll Image Generation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Check Worker Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Grab Transcript",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait 20 Sec",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "B-Roll Image Generation": {
+      "main": [
+        [
+          {
+            "node": "Split Script into Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Script into Chunks": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chunk Data": {
+      "main": [
+        [
+          {
+            "node": "Get Worker",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get All Workers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Workers": {
+      "main": [
+        [
+          {
+            "node": "Check for \"Ready\" Workers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check for \"Ready\" Workers": {
+      "main": [
+        [
+          {
+            "node": "Get Worker",
+            "type": "main",
+            "index": 1
+          }
+        ],
+        [
+          {
+            "node": "Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit": {
+      "main": [
+        [
+          {
+            "node": "Check Again in 10 Sec",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Again in 10 Sec": {
+      "main": [
+        [
+          {
+            "node": "Get All Workers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Worker": {
+      "main": [
+        [
+          {
+            "node": "Set Input Data for Chunk",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Set Status from \"Ready\" to \"Processing\"",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Input Data for Chunk": {
+      "main": [
+        [
+          {
+            "node": "Wait for both Paths to Finish",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Status from \"Ready\" to \"Processing\"": {
+      "main": [
+        [
+          {
+            "node": "Wait for both Paths to Finish",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Wait for both Paths to Finish": {
+      "main": [
+        [
+          {
+            "node": "Voiceover Chunk Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 30 Sec": {
+      "main": [
+        [
+          {
+            "node": "Grab All Workers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Grab All Workers": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Worker Status": {
+      "main": [
+        [
+          {
+            "node": "Limit2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Limit1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit1": {
+      "main": [
+        [
+          {
+            "node": "Wait 30 Sec",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Input Data for Voiceover Processing": {
+      "main": [
+        [
+          {
+            "node": "Prepare Render API Input for Voiceover",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit2": {
+      "main": [
+        [
+          {
+            "node": "Set Input Data for Voiceover Processing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Render API Input for Voiceover": {
+      "main": [
+        [
+          {
+            "node": "Merge Voiceover Chunks into One mp3 File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Voiceover Chunks into One mp3 File": {
+      "main": [
+        [
+          {
+            "node": "Download Finished Voiceover",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Finished Voiceover": {
+      "main": [
+        [
+          {
+            "node": "Upload Voiceover File to Project",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Voiceover File to Project": {
+      "main": [
+        [
+          {
+            "node": "Transcribe Audio (for Captions)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transcribe Audio (for Captions)": {
+      "main": [
+        [
+          {
+            "node": "Wait 20 Sec",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Request Transcript": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Grab Transcript": {
+      "main": [
+        [
+          {
+            "node": "Shift Transcript -600ms",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "JSON -> SRT-File": {
+      "main": [
+        [
+          {
+            "node": "Upload SRT-File to Project",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload SRT-File to Project": {
+      "main": [
+        [
+          {
+            "node": "Set Input Data for Final Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Render API Input for Final Video": {
+      "main": [
+        [
+          {
+            "node": "Render Final Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Input Data for Final Video": {
+      "main": [
+        [
+          {
+            "node": "Prepare Render API Input for Final Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render Final Video": {
+      "main": [
+        [
+          {
+            "node": "Download Final Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Final Video": {
+      "main": [
+        [
+          {
+            "node": "Upload Final Video to Project",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Final Video to Project": {
+      "main": [
+        [
+          {
+            "node": "Set Project Status to \"Done\"",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Project Status to \"Done\"": {
+      "main": [
+        [
+          {
+            "node": "Start Organizer Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shift Transcript -600ms": {
+      "main": [
+        [
+          {
+            "node": "JSON -> SRT-File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 20 Sec": {
+      "main": [
+        [
+          {
+            "node": "Request Transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Voiceover Chunk Workflow": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Chunks": {
+      "main": [
+        [
+          {
+            "node": "Limit1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Chunk Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "cc3b15dabc56305739bb557c6213337e02aa6d63df357d1d6e8626826c84b0e1"
+  }
+}
+
+4.1 Image B-Roll Workflow
+{
+  "nodes": [
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"scene_prompts\": [\n    {\n      \"prompt_id\": \"scene_01\",\n      \"prompt_text\": \"[detailed scene description with character action and environment]\"\n    },\n    {\n      \"prompt_id\": \"scene_02\",\n      \"prompt_text\": \"[detailed scene description]\"\n    }\n  ]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        416,
+        112
+      ],
+      "id": "6e7ca32d-8d47-4666-8e3b-48bfb5f3d6b0",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "output.scene_prompts",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        560,
+        -48
+      ],
+      "id": "955b3d83-cf61-4d38-919c-7560d7c12ea3",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a580467e-b879-46a4-8ef2-fbe5a42ceece",
+              "name": "prompt-text",
+              "value": "={{ $json.prompt_text }}",
+              "type": "string"
+            },
+            {
+              "id": "b77c363d-31aa-4e6a-a851-8c8d641f9615",
+              "name": "prompt-id",
+              "value": "={{ $json.prompt_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        880,
+        176
+      ],
+      "id": "2d565a5e-2ceb-4263-b745-8e7fabe91531",
+      "name": "set-loop-data"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        80,
+        -48
+      ],
+      "id": "1d7e2fc3-b55e-48a2-8dae-3d97fe074ec2",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "model": "mistralai/devstral-2512:free",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        224,
+        112
+      ],
+      "id": "43bed89d-e859-446b-abaa-c960480c3422",
+      "name": "Free OpenRouter Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "fXEl07gs5H5x6ULf",
+          "name": "Your OpenRouter Credentials"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Script:\n{{ $json.Script }}\n",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=You are an AI agent that generates image prompts for visual storytelling. Your task is to analyze a script and create prompts for consistent character imagery. The input script might be in German but still only output English.\nInput: A story script\nTask: Generate 6 scene image prompts for the main female character in different story situations.\nRequirements:\n\nCreate 6 scene prompts featuring the same character in different story situations\nAll scene prompts should depict moments that do not reveal the ending/finale.\nCharacter's emotional state should reflect early story emotions (sad, frustrated, struggling, contemplative, worried, etc.)\nEach scene prompt should be specific enough to generate a coherent image while maintaining character consistency\nEach scene prompt must begin with a detailed character description to ensure visual consistency across all scenes\n\nIMPORTANT CHARACTER APPEAL GUIDELINES:\n\nAvoid words like: wrinkles, weary, tired, weathered, aged, worn\n\nOutput Format (JSON):\njson{\n  \"scene_prompts\": [\n    {\n      \"prompt_id\": \"scene_01\",\n      \"prompt_text\": \"[detailed scene description with character action and environment]\"\n    },\n    {\n      \"prompt_id\": \"scene_02\",\n      \"prompt_text\": \"[detailed scene description]\"\n    }\n    // ... continue for all 6 scenes\n  ]\n}\nPrompt Guidelines:\nScene prompts: Include setting, action, emotion, clothing when relevant, body language. Maintain consistency by starting each prompt with the same detailed character description.\nUse clear, descriptive language suitable for image generation models.\nAvoid abstract concepts; focus on visual elements.\nFor the scene generation prompts, always use this template:\n\"Show a 70 year old German woman with blue eyes, [detailed description including facial features, hair, build, typical clothing, distinguishing characteristics, posture]. [Then describe the scene, action, etc.]\" (Total max length of five sentences but can be shorter if not necessary)\ne.g.: \"Show a 70 year old German woman with blue eyes, with silver hair styled in a neat bob, wearing a comfortable cardigan and reading glasses. She is sitting in the kitchen, reading the newspaper.\"\nThe character description at the beginning of each prompt should be super detailed and consistent across all 6 prompts to ensure the same character appears in every scene. Include facial features, hair color/style, build, posture, distinguishing characteristics, and typical clothing style.\nIf important, all the scenes would happen in Germany.\nMake SURE all Prompts NEVER mention anything graphic, and do not show any kids or people under the age of 18! Also none of the Image prompts should contain knives, blood or anything NSFW."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.1,
+      "position": [
+        224,
+        -48
+      ],
+      "id": "b46d7711-9291-497f-9918-e2f1b1cffd63",
+      "name": "Generate Image Prompts",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        720,
+        -48
+      ],
+      "id": "7a1466e8-e4e1-40d2-b86f-32478bbfcfe0",
+      "name": "Loop Over Prompts"
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "bucketName": "={{ $('When Executed by Another Workflow').first().json['Storage Bucket'] }}",
+        "fileName": "={{ $('When Executed by Another Workflow').first().json['Videos Folder Path'] }}/{{ $('When Executed by Another Workflow').first().json['Project Name'] }}/images/{{ $('set-loop-data').item.json['prompt-id'] }}.jpg",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.s3",
+      "typeVersion": 1,
+      "position": [
+        1424,
+        176
+      ],
+      "id": "13dffee3-cb45-4031-aeca-e9b30511a12b",
+      "name": "Upload Image to Project",
+      "credentials": {
+        "s3": {
+          "id": "mQiKZmHGY0aE8I7R",
+          "name": "Your Minio Credentials"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('When Executed by Another Workflow').first().json['Video Render API'] }}/v1/ffmpeg/compose",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"inputs\": [\n    {\n      \"file_url\": \"http://your-minio-ip:9000/{{ $('When Executed by Another Workflow').first().json['Storage Bucket'] }}/{{ $('When Executed by Another Workflow').first().json['Videos Folder Path'] }}/{{ $('When Executed by Another Workflow').first().json['Project Name'] }}/images/{{ $('set-loop-data').item.json['prompt-id'] }}.jpg\"\n    }\n  ],\n  \"filters\": [\n    {\n      \"filter\": \"[0:v]format=yuv444p,scale=5760:3240,zoompan=z='1+on*0.0005':d=300:x='trunc(iw/2-(iw/zoom/2))':y='trunc(ih/2-(ih/zoom/2))':s=1920x1080:fps=30,format=yuv420p[v]\"\n    }\n  ],\n  \"outputs\": [\n    {\n      \"options\": [\n        {\"option\": \"-map\", \"argument\": \"[v]\"},\n        {\"option\": \"-c:v\", \"argument\": \"libx264\"},\n        {\"option\": \"-r\", \"argument\": \"30\"},\n        {\"option\": \"-t\", \"argument\": \"10\"},\n        {\"option\": \"-crf\", \"argument\": \"18\"},\n        {\"option\": \"-preset\", \"argument\": \"slow\"},\n        {\"option\": \"-f\", \"argument\": \"mp4\"}\n      ]\n    }\n  ],\n  \"metadata\": {\n    \"thumbnail\": true,\n    \"filesize\": true,\n    \"duration\": true,\n    \"bitrate\": true,\n    \"encoder\": true\n  },\n  \"id\": \"zoom_effect_{{ $('set-loop-data').first().json['prompt-id'] }}\"\n}",
+        "options": {
+          "timeout": 999999999
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1616,
+        176
+      ],
+      "id": "b585d593-0e83-47bc-8523-8bfd21a3aed3",
+      "name": "Add Zoom In Effect to Image"
+    },
+    {
+      "parameters": {
+        "url": "=http://{{ $json.response[0].file_url.replace(\"http://minio\", $('When Executed by Another Workflow').first().json['Video Render API'].replace('http://', '').replace(':8081', '')) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1808,
+        176
+      ],
+      "id": "c113b0fd-964f-45f3-9156-ea8dc19359c3",
+      "name": "Download Image w/ Zoom In Effect"
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "bucketName": "={{ $('When Executed by Another Workflow').first().json['Storage Bucket'] }}",
+        "fileName": "={{ $('When Executed by Another Workflow').first().json['Videos Folder Path'] }}/{{ $('When Executed by Another Workflow').first().json['Project Name'] }}/clips/{{ $('set-loop-data').item.json['prompt-id'] }}.mp4",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.s3",
+      "typeVersion": 1,
+      "position": [
+        2000,
+        176
+      ],
+      "id": "76bd465c-4ae5-4416-b703-909ac6e25a1d",
+      "name": "Upload Image w/ Zoom In Effect to Project",
+      "credentials": {
+        "s3": {
+          "id": "mQiKZmHGY0aE8I7R",
+          "name": "Your Minio Credentials"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        880,
+        -64
+      ],
+      "id": "d7a068b4-a426-408b-8fe9-3d1c29934e68",
+      "name": "Limit"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "5a712e68-9c2a-4ca7-877f-14a188122009",
+              "name": "Total Clips Number",
+              "value": "=6",
+              "type": "string"
+            },
+            {
+              "id": "e5d6ed9f-8ce3-495c-bc42-ff6286fc79df",
+              "name": "Clips Download Base URL",
+              "value": "=http://your-minio-server-ip:9000/{{ $('When Executed by Another Workflow').first().json['Storage Bucket'] }}/{{ $('When Executed by Another Workflow').first().json['Videos Folder Path'] }}/{{ $('When Executed by Another Workflow').first().json['Project Name'] }}/clips/",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1024,
+        -64
+      ],
+      "id": "01f362ac-22bd-43ba-86b5-843cd797e126",
+      "name": "Render Input Data"
+    },
+    {
+      "parameters": {
+        "jsCode": "// --- n8n Code Node: FFmpeg JSON Payload Builder ---\n// Get the input variables from the previous node.\nconst total_video_clips = parseInt($json[\"Total Clips Number\"]);\nconst b_roll_download_path = $json[\"Clips Download Base URL\"];\n\n// 1. Build the 'inputs' array.\nconst inputs = [];\nfor (let i = 1; i <= total_video_clips; i++) {\n  // Format scene number with leading zero (scene_01.mp4, scene_02.mp4, etc.)\n  const sceneNumber = String(i).padStart(2, '0');\n  inputs.push({\n    \"file_url\": `${b_roll_download_path}scene_${sceneNumber}.mp4`\n  });\n}\n\n// 2. Build the 'filters' array with SAR normalization.\nconst filter_parts = [];\nfor (let i = 0; i < total_video_clips; i++) {\n  filter_parts.push(`[${i}:v]setsar=1/1[v${i}]`);\n}\n\nconst concat_inputs = [];\nfor (let i = 0; i < total_video_clips; i++) {\n  concat_inputs.push(`[v${i}]`);\n}\n\nconst concat_part = `${concat_inputs.join('')}concat=n=${total_video_clips}:v=1:a=0[v]`;\nconst full_filter = filter_parts.join(';') + ';' + concat_part;\n\nconst filters = [{\n  \"filter\": full_filter\n}];\n\n// 3. Build the 'outputs' array.\nconst outputs = [{\n  \"options\": [\n    {\n      \"option\": \"-map\",\n      \"argument\": \"[v]\"\n    },\n    {\n      \"option\": \"-c:v\",\n      \"argument\": \"libx264\"\n    },\n    {\n      \"option\": \"-preset\",\n      \"argument\": \"veryfast\"\n    },\n    {\n      \"option\": \"-r\",\n      \"argument\": \"30\" // Back to 30 fps as requested\n    },\n    {\n      \"option\": \"-f\",\n      \"argument\": \"mp4\"\n    }\n  ],\n  \"file_url\": \"output.mp4\"\n}];\n\n// 4. Construct the final JSON payload.\nconst payload = {\n  inputs: inputs,\n  filters: filters,\n  outputs: outputs\n};\n\nreturn [{\n  json: payload\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        -64
+      ],
+      "id": "13c5f5b8-10c6-4a65-8e92-f43496976e2a",
+      "name": "Generate Render API Payload"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('When Executed by Another Workflow').first().json['Video Render API'] }}/v1/ffmpeg/compose",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 3000000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1392,
+        -64
+      ],
+      "id": "165d1021-0470-406b-94fe-63f30eb20519",
+      "name": "Merge All Clips",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "6IxRggDdH0Fh3HPY",
+          "name": "nca-toolkit ffmpeg server"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.replicate.com/v1/models/prunaai/z-image-turbo/predictions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "wait"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"input\": {\n    \"width\": 1280,\n    \"height\": 720,\n    \"prompt\": {{ JSON.stringify($json['prompt-text']) }},\n    \"output_format\": \"jpg\",\n    \"guidance_scale\": 0,\n    \"output_quality\": 80,\n    \"num_inference_steps\": 8\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1056,
+        176
+      ],
+      "id": "f4ecc957-1b56-4573-ad0b-ee2acc4489d2",
+      "name": "Generate Image w/ Z-Image (>$0,01/Image)"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.urls.stream }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1232,
+        176
+      ],
+      "id": "e8eac928-db3f-4226-9f7d-bc14dd3a2cad",
+      "name": "Download Image"
+    },
+    {
+      "parameters": {
+        "content": "## Generate Image Prompts",
+        "height": 192,
+        "width": 624,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        48,
+        -96
+      ],
+      "id": "dff9636a-af9b-468b-a389-923f3efcd17d",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## Generate B-Roll Footage",
+        "height": 240,
+        "width": 1296,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        864,
+        128
+      ],
+      "id": "ab3c41af-7198-4af5-934d-fd90acff74d6",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## Render Final Loop Video",
+        "height": 224,
+        "width": 1104,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        864,
+        -112
+      ],
+      "id": "fc415884-b43e-4cc9-9ff6-1c54ecba0c53",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "url": "=http://{{ $json.response[0].file_url.replace(\"http://minio\", $('When Executed by Another Workflow').first().json['Video Render API'].replace('http://', '').replace(':8081', '')) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1584,
+        -64
+      ],
+      "id": "7df79313-0788-4ed7-bd0e-9f9d417950c5",
+      "name": "Download Merged Clips Loop"
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "bucketName": "={{ $('When Executed by Another Workflow').first().json['Storage Bucket'] }}",
+        "fileName": "={{ $('When Executed by Another Workflow').first().json['Videos Folder Path'] }}/{{ $('When Executed by Another Workflow').first().json['Project Name'] }}/clips/loop-video.mp4",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.s3",
+      "typeVersion": 1,
+      "position": [
+        1776,
+        -64
+      ],
+      "id": "d3c1bb3b-40cb-4419-acde-9b1bb5f0efb2",
+      "name": "Upload Merged Clips Loop to Project",
+      "credentials": {
+        "s3": {
+          "id": "mQiKZmHGY0aE8I7R",
+          "name": "Your Minio Credentials"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Generate Image Prompts",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Prompts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set-loop-data": {
+      "main": [
+        [
+          {
+            "node": "Generate Image w/ Z-Image (>$0,01/Image)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Generate Image Prompts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Free OpenRouter Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generate Image Prompts",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Image Prompts": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Prompts": {
+      "main": [
+        [
+          {
+            "node": "Limit",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "set-loop-data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Image to Project": {
+      "main": [
+        [
+          {
+            "node": "Add Zoom In Effect to Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Zoom In Effect to Image": {
+      "main": [
+        [
+          {
+            "node": "Download Image w/ Zoom In Effect",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Image w/ Zoom In Effect": {
+      "main": [
+        [
+          {
+            "node": "Upload Image w/ Zoom In Effect to Project",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Image w/ Zoom In Effect to Project": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Prompts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit": {
+      "main": [
+        [
+          {
+            "node": "Render Input Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render Input Data": {
+      "main": [
+        [
+          {
+            "node": "Generate Render API Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Render API Payload": {
+      "main": [
+        [
+          {
+            "node": "Merge All Clips",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge All Clips": {
+      "main": [
+        [
+          {
+            "node": "Download Merged Clips Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Image w/ Z-Image (>$0,01/Image)": {
+      "main": [
+        [
+          {
+            "node": "Download Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Image": {
+      "main": [
+        [
+          {
+            "node": "Upload Image to Project",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Merged Clips Loop": {
+      "main": [
+        [
+          {
+            "node": "Upload Merged Clips Loop to Project",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "cc3b15dabc56305739bb557c6213337e02aa6d63df357d1d6e8626826c84b0e1"
+  }
+}
+
+Transcript Workflow
+{
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1728,
+        800
+      ],
+      "id": "1617d960-c98c-4448-816d-8a58fbdfe032",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "language": "python",
+        "pythonCode": "# The input items from the previous node are automatically available in the 'items' list.\ninput_item = items[0]\n\n# Access the captions array from the input item's JSON data.\ncaptions_list = input_item['json']['captions']\n\n# Use a list comprehension to extract only the 'text' value from each caption.\ntext_parts = [item['text'] for item in captions_list]\n\n# Join all the extracted text parts into a single string with spaces.\nfull_transcript = ' '.join(text_parts)\n\n# --- THE FIX ---\n# Instead of printing, create the data structure n8n expects and return it.\n# It must be a list of dictionaries, with each dictionary having a 'json' key.\nreturn [{'json': {'Transcript': full_transcript}}]"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1360,
+        800
+      ],
+      "id": "7d002d81-d1b7-4c20-b384-f5dcc6e9047f",
+      "name": "Remove Time Stamps"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://tactiq-apps-prod.tactiq.io/transcript",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "videoUrl",
+              "value": "={{ $json['Source Video URL'] }}"
+            },
+            {
+              "name": "langCode",
+              "value": "en"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1552,
+        800
+      ],
+      "id": "acb0cec6-c34b-4718-bec3-7270437e3371",
+      "name": "Get YT Transcript from URL"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fe737471-f305-455f-b266-60979be737ac",
+              "name": "Summary",
+              "value": "={{ $json.Transcript?.split(' ').slice(0, 100).join(' ') ?? null }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1168,
+        688
+      ],
+      "id": "1f24335e-935c-4873-9cfd-cb1b08047e4d",
+      "name": "Summary (First 100 Words)"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -960,
+        832
+      ],
+      "id": "b75f481a-ccda-4f1e-bdc8-bf382a4a817d",
+      "name": "Output Transcript + Summary"
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Get YT Transcript from URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove Time Stamps": {
+      "main": [
+        [
+          {
+            "node": "Summary (First 100 Words)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Output Transcript + Summary",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Get YT Transcript from URL": {
+      "main": [
+        [
+          {
+            "node": "Remove Time Stamps",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Summary (First 100 Words)": {
+      "main": [
+        [
+          {
+            "node": "Output Transcript + Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "cc3b15dabc56305739bb557c6213337e02aa6d63df357d1d6e8626826c84b0e1"
+  }
+}
+
+Voiceover Chunk Workflow
+{
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -208,
+        -128
+      ],
+      "id": "9d61200a-096a-4326-843a-4fabe1db6c69",
+      "name": "trigger"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://genaipro.vn/api/v1/labs/task",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"input\": {{ JSON.stringify($json['Chunk Script']) }},\n  \"voice_id\": \"your-elevenlabs-voice-id\",\n  \"model_id\": \"eleven_multilingual_v2\",\n  \"style\": 0.4,\n  \"speed\": 0.95,\n  \"use_speaker_boost\": true,\n  \"similarity\": 0.6,\n  \"stability\": 0.7\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -48,
+        -128
+      ],
+      "id": "abacc6e4-5e30-4d39-a560-be778303230e",
+      "name": "Generate Voiceover w/ \"GenAIPro.vn\""
+    },
+    {
+      "parameters": {
+        "amount": 30
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        144,
+        -128
+      ],
+      "id": "f81fe8a3-b474-4fae-9f11-1587645164b8",
+      "name": "Wait 30 Sec",
+      "webhookId": "81ad450a-324f-425c-8157-ee418d12dcd5"
+    },
+    {
+      "parameters": {
+        "url": "=https://genaipro.vn/api/v1/labs/task/{{ $('Generate Voiceover w/ \"GenAIPro.vn\"').first().json.task_id }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        272,
+        -128
+      ],
+      "id": "ca88be02-4b31-42d8-a6b6-b4294ead09a6",
+      "name": "Check Status"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.status }}",
+                    "rightValue": "completed",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "ffc3f619-25eb-4189-b8eb-a1f3f26ff507"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "completed"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "2a5d39eb-e4b2-4ca2-9dea-af7f856e2603",
+                    "leftValue": "={{ $json.status }}",
+                    "rightValue": "processing",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "processing"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        432,
+        -128
+      ],
+      "id": "788e9602-98a7-4a24-bb7c-4f372c8d71a0",
+      "name": "Finished? -> Download / Processing? -> Wait"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.result }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        656,
+        -144
+      ],
+      "id": "705e0bdc-a7ff-42db-a5c2-2a06d3a34f5b",
+      "name": "Download Voiceover Chunk"
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "bucketName": "={{ $('trigger').first().json['Storage Bucket'] }}",
+        "fileName": "={{ $('trigger').first().json['Videos Folder Path'] }}/{{ $('trigger').first().json['Project Name'] }}/voiceover/audio-chunk-{{ $('trigger').first().json['Chunk Number'] }}.mp3",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.s3",
+      "typeVersion": 1,
+      "position": [
+        864,
+        -144
+      ],
+      "id": "5579351f-7edf-4e73-b9a8-3eca81f30eb0",
+      "name": "Upload Chunk to Project",
+      "credentials": {
+        "s3": {
+          "id": "mQiKZmHGY0aE8I7R",
+          "name": "Your Minio Credentials"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Generate Voiceover Chunk",
+        "height": 272,
+        "width": 832,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -240,
+        -192
+      ],
+      "id": "f2d917c0-ff78-4151-9bcf-aa08dd6daa8d",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## Upload Chunk to Project",
+        "height": 208,
+        "width": 624,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        608,
+        -192
+      ],
+      "id": "3f4504c0-a971-4656-9c35-2d89242ea8e8",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "authentication": "nocoDbApiToken",
+        "operation": "update",
+        "projectId": "={{ $('trigger').first().json['Channel Base Name'] }}",
+        "table": "={{ $('trigger').first().json['Worker Table Name'] }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "=Id",
+              "fieldValue": "={{ $('trigger').first().json.Id }}"
+            },
+            {
+              "fieldName": "Worker Status",
+              "fieldValue": "Ready"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.nocoDb",
+      "typeVersion": 3,
+      "position": [
+        1072,
+        -144
+      ],
+      "id": "96f2cc1b-b19d-4944-ac87-e2260c90bd9f",
+      "name": "Change Worker Status to \"Ready\"",
+      "credentials": {
+        "nocoDbApiToken": {
+          "id": "qvsAfhIybkPMEqJB",
+          "name": "Your API Key for NocoDB"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "trigger": {
+      "main": [
+        [
+          {
+            "node": "Generate Voiceover w/ \"GenAIPro.vn\"",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Voiceover w/ \"GenAIPro.vn\"": {
+      "main": [
+        [
+          {
+            "node": "Wait 30 Sec",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Wait 30 Sec": {
+      "main": [
+        [
+          {
+            "node": "Check Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Status": {
+      "main": [
+        [
+          {
+            "node": "Finished? -> Download / Processing? -> Wait",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Finished? -> Download / Processing? -> Wait": {
+      "main": [
+        [
+          {
+            "node": "Download Voiceover Chunk",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait 30 Sec",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Voiceover Chunk": {
+      "main": [
+        [
+          {
+            "node": "Upload Chunk to Project",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Upload Chunk to Project": {
+      "main": [
+        [
+          {
+            "node": "Change Worker Status to \"Ready\"",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "cc3b15dabc56305739bb557c6213337e02aa6d63df357d1d6e8626826c84b0e1"
+  }
+}

@@ -1,0 +1,275 @@
+id: idea-scraper
+namespace: company.team
+description: |
+  Scrapes YouTube channels for viral videos and queues them for processing.
+  Runs on a schedule or can be triggered manually.
+
+labels:
+  project: faceless-video-generator
+  type: scraper
+
+triggers:
+  - id: schedule
+    type: io.kestra.plugin.core.trigger.Schedule
+    cron: "0 */12 * * *"
+    disabled: false
+
+inputs:
+  - id: force_run
+    type: BOOLEAN
+    defaults: false
+    description: Force run even if scraper is disabled in settings
+
+tasks:
+  - id: check_scraper_enabled
+    type: io.kestra.plugin.core.http.Request
+    uri: "{{ kv('SUPABASE_URL') }}/rest/v1/settings?key=eq.scraper_enabled&select=value"
+    method: GET
+    headers:
+      apikey: "{{ kv('SUPABASE_ANON_KEY') }}"
+      Authorization: "Bearer {{ kv('SUPABASE_ANON_KEY') }}"
+
+  - id: get_active_channels
+    type: io.kestra.plugin.core.http.Request
+    uri: "{{ kv('SUPABASE_URL') }}/rest/v1/channels?is_active=eq.true&select=*"
+    method: GET
+    headers:
+      apikey: "{{ kv('SUPABASE_ANON_KEY') }}"
+      Authorization: "Bearer {{ kv('SUPABASE_ANON_KEY') }}"
+
+  - id: scrape_channels
+    type: io.kestra.plugin.scripts.python.Script
+    beforeCommands:
+      - pip install requests feedparser > /dev/null 2>&1
+    inputFiles:
+      channels.json: "{{ outputs.get_active_channels.body }}"
+    script: |
+      import json
+      import requests
+      import feedparser
+      from datetime import datetime, timezone
+      from typing import List, Dict
+      
+      with open('channels.json', 'r') as f:
+          channels = json.load(f)
+      
+      if not channels:
+          print("No active channels found")
+          with open('viral_videos.json', 'w') as f:
+              json.dump([], f)
+          exit(0)
+      
+      def get_channel_videos(channel_id: str) -> List[Dict]:
+          feed_url = "https://www.youtube.com/feeds/videos.xml?channel_id=" + channel_id
+          try:
+              feed = feedparser.parse(feed_url)
+              videos = []
+              for entry in feed.entries:
+                  views = 0
+                  if 'media_statistics' in entry:
+                      views = int(entry.media_statistics.get('views', 0))
+                  elif 'media_community' in entry:
+                      stats = entry.media_community.get('media_statistics', {})
+                      views = int(stats.get('views', 0))
+                  
+                  videos.append({
+                      'url': entry.link,
+                      'title': entry.title,
+                      'published': entry.published,
+                      'views': views,
+                      'channel_id': channel_id
+                  })
+              return videos
+          except Exception as e:
+              print("Error fetching channel " + channel_id + ": " + str(e))
+              return []
+      
+      def is_viral(video: Dict, threshold_views: int = 7000, max_hours: int = 48) -> bool:
+          try:
+              published = datetime.fromisoformat(video['published'].replace('Z', '+00:00'))
+              now = datetime.now(timezone.utc)
+              hours_since = (now - published).total_seconds() / 3600
+              
+              if hours_since > max_hours:
+                  return False
+              
+              views = video.get('views', 0)
+              
+              if views > threshold_views:
+                  return True
+              
+              if views >= 4000 and hours_since <= 12:
+                  return True
+              
+              return False
+          except Exception as e:
+              print("Error checking viral status: " + str(e))
+              return False
+      
+      viral_videos = []
+      
+      for channel in channels:
+          channel_id = channel['channel_id']
+          threshold = channel.get('viral_threshold_views', 7000)
+          max_hours = channel.get('viral_threshold_hours', 48)
+          
+          print("Scraping channel: " + channel['channel_name'] + " (" + channel_id + ")")
+          
+          videos = get_channel_videos(channel_id)
+          print("  Found " + str(len(videos)) + " videos")
+          
+          for video in videos:
+              if is_viral(video, threshold, max_hours):
+                  video['channel_db_id'] = channel['id']
+                  video['language'] = channel['language']
+                  viral_videos.append(video)
+                  print("  Viral: " + video['title'] + " (" + str(video['views']) + " views)")
+      
+      print("Total viral videos found: " + str(len(viral_videos)))
+      
+      with open('viral_videos.json', 'w') as f:
+          json.dump(viral_videos, f, indent=2)
+    outputFiles:
+      - viral_videos.json
+
+  - id: filter_already_processed
+    type: io.kestra.plugin.scripts.python.Script
+    beforeCommands:
+      - pip install requests > /dev/null 2>&1
+    env:
+      SUPABASE_URL: "{{ kv('SUPABASE_URL') }}"
+      SUPABASE_KEY: "{{ kv('SUPABASE_ANON_KEY') }}"
+    inputFiles:
+      viral_videos.json: "{{ outputs.scrape_channels.outputFiles['viral_videos.json'] }}"
+    script: |
+      import json
+      import os
+      import requests
+      
+      SUPABASE_URL = os.environ['SUPABASE_URL']
+      SUPABASE_KEY = os.environ['SUPABASE_KEY']
+      
+      headers = {
+          'apikey': SUPABASE_KEY,
+          'Authorization': 'Bearer ' + SUPABASE_KEY
+      }
+      
+      with open('viral_videos.json', 'r') as f:
+          viral_videos = json.load(f)
+      
+      if not viral_videos:
+          print("No viral videos to filter")
+          with open('new_videos.json', 'w') as f:
+              json.dump([], f)
+          exit(0)
+      
+      response = requests.get(
+          SUPABASE_URL + "/rest/v1/processed_videos?select=source_video_url",
+          headers=headers
+      )
+      processed = set()
+      for v in response.json():
+          processed.add(v['source_video_url'])
+      
+      response = requests.get(
+          SUPABASE_URL + "/rest/v1/projects?select=source_video_url",
+          headers=headers
+      )
+      in_projects = set()
+      for v in response.json():
+          in_projects.add(v['source_video_url'])
+      
+      new_videos = [v for v in viral_videos if v['url'] not in processed and v['url'] not in in_projects]
+      
+      print("Filtered: " + str(len(viral_videos)) + " viral -> " + str(len(new_videos)) + " new")
+      
+      with open('new_videos.json', 'w') as f:
+          json.dump(new_videos, f, indent=2)
+    outputFiles:
+      - new_videos.json
+
+  - id: create_projects
+    type: io.kestra.plugin.scripts.python.Script
+    beforeCommands:
+      - pip install requests python-slugify > /dev/null 2>&1
+    env:
+      SUPABASE_URL: "{{ kv('SUPABASE_URL') }}"
+      SUPABASE_KEY: "{{ kv('SUPABASE_ANON_KEY') }}"
+    inputFiles:
+      new_videos.json: "{{ outputs.filter_already_processed.outputFiles['new_videos.json'] }}"
+    script: |
+      import json
+      import os
+      import requests
+      from slugify import slugify
+      from datetime import datetime
+      
+      SUPABASE_URL = os.environ['SUPABASE_URL']
+      SUPABASE_KEY = os.environ['SUPABASE_KEY']
+      
+      headers = {
+          'apikey': SUPABASE_KEY,
+          'Authorization': 'Bearer ' + SUPABASE_KEY,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+      }
+      
+      with open('new_videos.json', 'r') as f:
+          new_videos = json.load(f)
+      
+      if not new_videos:
+          print("No new videos to create projects for")
+          with open('created_projects.json', 'w') as f:
+              json.dump([], f)
+          exit(0)
+      
+      created_projects = []
+      
+      for video in new_videos:
+          slug = slugify(video['title'][:50])
+          timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+          project_slug = slug + "-" + timestamp
+          
+          project_data = {
+              'channel_id': video.get('channel_db_id'),
+              'source_video_url': video['url'],
+              'source_video_title': video['title'],
+              'project_name': video['title'][:100],
+              'project_slug': project_slug,
+              'status': 'queued',
+              'language': video.get('language', 'pt-BR'),
+              'storage_folder': "videos/" + project_slug
+          }
+          
+          response = requests.post(
+              SUPABASE_URL + "/rest/v1/projects",
+              headers=headers,
+              json=project_data
+          )
+          
+          if response.status_code == 201:
+              project = response.json()[0]
+              created_projects.append(project)
+              print("Created project: " + project['project_name'])
+          else:
+              print("Failed to create project: " + response.text)
+      
+      print("Total projects created: " + str(len(created_projects)))
+      
+      with open('created_projects.json', 'w') as f:
+          json.dump(created_projects, f, indent=2)
+    outputFiles:
+      - created_projects.json
+
+  - id: trigger_organizer
+    type: io.kestra.plugin.core.flow.ForEach
+    values: "{{ outputs.create_projects.outputFiles['created_projects.json'] | jq('.[]') }}"
+    concurrencyLimit: 1
+    tasks:
+      - id: start_processing
+        type: io.kestra.plugin.core.flow.Subflow
+        namespace: company.team
+        flowId: video-organizer
+        inputs:
+          project_id: "{{ json(taskrun.value).id }}"
+        wait: false

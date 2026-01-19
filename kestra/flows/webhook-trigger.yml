@@ -1,0 +1,60 @@
+id: webhook-trigger
+namespace: company.team
+description: |
+  Webhook endpoint to trigger workflows from the web interface.
+  Supports triggering specific workflows with custom inputs.
+
+labels:
+  project: faceless-video-generator
+  type: webhook
+
+triggers:
+  - id: webhook
+    type: io.kestra.plugin.core.trigger.Webhook
+    key: "faceless-video-generator-webhook"
+
+inputs:
+  - id: workflow
+    type: STRING
+    description: Which workflow to trigger (scraper, organizer)
+    defaults: organizer
+  - id: project_id
+    type: STRING
+    required: false
+    description: Project ID for organizer workflow
+  - id: force_run
+    type: BOOLEAN
+    defaults: false
+    description: Force run for scraper
+
+tasks:
+  - id: route_workflow
+    type: io.kestra.plugin.core.flow.Switch
+    value: "{{ inputs.workflow }}"
+    cases:
+      scraper:
+        - id: trigger_scraper
+          type: io.kestra.plugin.core.flow.Subflow
+          namespace: company.team
+          flowId: idea-scraper
+          inputs:
+            force_run: "{{ inputs.force_run }}"
+          wait: false
+      
+      organizer:
+        - id: trigger_organizer
+          type: io.kestra.plugin.core.flow.Subflow
+          namespace: company.team
+          flowId: video-organizer
+          inputs:
+            project_id: "{{ inputs.project_id }}"
+          wait: false
+    
+    defaults:
+      - id: unknown_workflow
+        type: io.kestra.plugin.core.log.Log
+        message: "Unknown workflow requested: {{ inputs.workflow }}"
+
+  - id: response
+    type: io.kestra.plugin.core.log.Log
+    message: "Triggered workflow: {{ inputs.workflow }} - Project ID: {{ inputs.project_id | default('N/A') }}"
