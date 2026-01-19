@@ -3,12 +3,12 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Install dependencies
-COPY requirements.txt .
+COPY web/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application
-COPY app.py .
-COPY static/ ./static/
+COPY web/app.py .
+COPY web/static/ ./static/
 
 # Expose port
 EXPOSE 8000

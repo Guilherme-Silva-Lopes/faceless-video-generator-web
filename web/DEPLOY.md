@@ -1,18 +1,19 @@
 # Web Interface Deployment Guide
 
-## Option 1: Deploy on EasyPanel with Git
+## Option 1: Deploy on EasyPanel with GitHub
 
 1. Create a new App in EasyPanel
-2. Select "Git" as source
-3. Enter repository: `https://github.com/Guilherme-Silva-Lopes/faceless-video-generator-web.git`
-4. Set Build settings:
-   - Build Command: (leave empty, uses Dockerfile)
-   - Dockerfile Path: `web/Dockerfile`
-5. Add Environment Variables:
+2. Select "GitHub" as source
+3. Configure:
+   - **Owner:** `Guilherme-Silva-Lopes`
+   - **Repository:** `faceless-video-generator-web`
+   - **Branch:** `main`
+   - **Build Path:** `/` (or leave default)
+4. Add Environment Variables:
    - `SUPABASE_URL` - Your Supabase project URL
    - `SUPABASE_KEY` - Your Supabase anon key
    - `KESTRA_WEBHOOK_URL` - Your Kestra webhook URL
-6. Deploy!
+5. Deploy!
 
 ## Option 2: Docker Compose
 
@@ -23,7 +24,7 @@ version: '3.8'
 services:
   web:
     build:
-      context: ./web
+      context: .
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
