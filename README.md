@@ -89,10 +89,10 @@ Sistema automatizado para geração de vídeos faceless a partir de vídeos vira
 Vá para [https://kestra.tribeai.com.br](https://kestra.tribeai.com.br) e adicione as seguintes chaves no namespace `company.team`:
 
 ```
-SUPABASE_URL          = https://adkjkixcisfjogkrkupg.supabase.co
+SUPABASE_URL          = (seu Supabase URL - Dashboard > Settings > API)
 SUPABASE_ANON_KEY     = (seu anon key)
 SUPABASE_SERVICE_KEY  = (seu service key - Dashboard > Settings > API)
-MINIO_ENDPOINT        = https://console-projeto-1-minio.2eisou.easypanel.host
+MINIO_ENDPOINT        = (seu MinIO endpoint URL)
 MINIO_ACCESS_KEY      = (sua access key do MinIO)
 MINIO_SECRET_KEY      = (sua secret key do MinIO)
 MINIO_BUCKET          = nca-toolkit

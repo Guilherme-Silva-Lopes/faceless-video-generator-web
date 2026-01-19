@@ -1,96 +1,55 @@
-# Faceless Video Generator - Web Interface Deployment Guide
+# Web Interface Deployment Guide
 
-## Deploy to EasyPanel
+## Option 1: Deploy on EasyPanel with Git
 
-### Option 1: Using Docker (Recommended)
+1. Create a new App in EasyPanel
+2. Select "Git" as source
+3. Enter repository: `https://github.com/Guilherme-Silva-Lopes/faceless-video-generator-web.git`
+4. Set Build settings:
+   - Build Command: (leave empty, uses Dockerfile)
+   - Dockerfile Path: `web/Dockerfile`
+5. Add Environment Variables:
+   - `SUPABASE_URL` - Your Supabase project URL
+   - `SUPABASE_KEY` - Your Supabase anon key
+   - `KESTRA_WEBHOOK_URL` - Your Kestra webhook URL
+6. Deploy!
 
-1. **Push to GitHub**
-   
-   First, create a GitHub repository and push the code:
-   
-   ```bash
-   cd web
-   git init
-   git add .
-   git commit -m "Initial commit"
-   git remote add origin https://github.com/YOUR_USERNAME/faceless-video-generator-web.git
-   git push -u origin main
-   ```
+## Option 2: Docker Compose
 
-2. **Create App in EasyPanel**
-   
-   - Go to your EasyPanel dashboard
-   - Click "Create Service" > "App"
-   - Name: `video-generator-web`
-   - Select "GitHub" as source
-   - Connect your repository
-   - Set the following environment variables:
-
-3. **Environment Variables**
-   
-   ```
-   SUPABASE_URL=https://adkjkixcisfjogkrkupg.supabase.co
-   SUPABASE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFka2praXhjaXNmam9na3JrdXBnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY5Njg4MDMsImV4cCI6MjA1MjU0NDgwM30.kcswO84SUbI9ytrt2b_l_SVlcz_tFq93OLmnUFqmQf8
-   KESTRA_URL=https://kestra.tribeai.com.br
-   KESTRA_NAMESPACE=company.team
-   ```
-
-4. **Domain Configuration**
-   
-   - Go to "Domains" tab
-   - Add your domain or use the auto-generated EasyPanel subdomain
-   - Enable HTTPS
-
-### Option 2: Using Docker Compose (Local/VPS)
-
-Create a `docker-compose.yml` file:
+Create a `docker-compose.yml`:
 
 ```yaml
 version: '3.8'
-
 services:
   web:
-    build: ./web
+    build:
+      context: ./web
+      dockerfile: Dockerfile
     ports:
       - "8000:8000"
     environment:
-      - SUPABASE_URL=https://adkjkixcisfjogkrkupg.supabase.co
-      - SUPABASE_KEY=your_anon_key
-      - KESTRA_URL=https://kestra.tribeai.com.br
-      - KESTRA_NAMESPACE=company.team
-    restart: unless-stopped
+      - SUPABASE_URL=your_supabase_url_here
+      - SUPABASE_KEY=your_supabase_anon_key_here
+      - KESTRA_WEBHOOK_URL=https://kestra.tribeai.com.br/api/v1/executions/webhook/company.team/webhook-trigger/faceless-video-generator-webhook
 ```
 
-Run with:
+Run: `docker-compose up -d`
+
+## Option 3: Direct Python
+
 ```bash
-docker-compose up -d
+cd web
+pip install -r requirements.txt
+export SUPABASE_URL="your_supabase_url_here"
+export SUPABASE_KEY="your_supabase_anon_key_here"
+export KESTRA_WEBHOOK_URL="https://kestra.tribeai.com.br/api/v1/executions/webhook/company.team/webhook-trigger/faceless-video-generator-webhook"
+uvicorn app:app --host 0.0.0.0 --port 8000
 ```
 
-### Option 3: Direct Python Deployment
+## Environment Variables
 
-1. Install dependencies:
-   ```bash
-   cd web
-   pip install -r requirements.txt
-   ```
-
-2. Set environment variables:
-   ```bash
-   export SUPABASE_URL="https://adkjkixcisfjogkrkupg.supabase.co"
-   export SUPABASE_KEY="your_anon_key"
-   export KESTRA_URL="https://kestra.tribeai.com.br"
-   export KESTRA_NAMESPACE="company.team"
-   ```
-
-3. Run the server:
-   ```bash
-   uvicorn app:app --host 0.0.0.0 --port 8000
-   ```
-
-## Post-Deployment Checklist
-
-- [ ] Verify environment variables are set correctly
-- [ ] Test API endpoints: `/api/stats`, `/api/channels`
-- [ ] Test channel creation
-- [ ] Test manual video addition
-- [ ] Verify Kestra webhook triggers are working
+| Variable | Description | Required |
+|----------|-------------|----------|
+| SUPABASE_URL | Your Supabase project URL | Yes |
+| SUPABASE_KEY | Your Supabase anon key | Yes |
+| KESTRA_WEBHOOK_URL | Kestra webhook endpoint | Yes |

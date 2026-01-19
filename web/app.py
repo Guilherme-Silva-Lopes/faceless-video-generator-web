@@ -14,7 +14,7 @@ import os
 from datetime import datetime
 
 # Configuration from environment variables
-SUPABASE_URL = os.getenv("SUPABASE_URL", "https://adkjkixcisfjogkrkupg.supabase.co")
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 KESTRA_URL = os.getenv("KESTRA_URL", "https://kestra.tribeai.com.br")
 KESTRA_NAMESPACE = os.getenv("KESTRA_NAMESPACE", "company.team")
