@@ -16,16 +16,20 @@ inputs:
 outputs:
   - id: transcript
     type: STRING
-    value: "{{ outputs.extract_transcript.vars.transcript | default('') }}"
+    value: "{{ read(outputs.extract_transcript.outputFiles['transcript.txt']) | default('') }}"
   - id: summary
     type: STRING
-    value: "{{ outputs.generate_summary.vars.summary | default('No summary available') }}"
+    value: "{{ read(outputs.generate_summary.outputFiles['summary.txt']) | default('No summary available') }}"
 
 tasks:
-  - id: extract_video_id
+  - id: extract_transcript
     type: io.kestra.plugin.scripts.python.Script
+    beforeCommands:
+      - pip install youtube-transcript-api > /dev/null 2>&1
     script: |
       import re
+      from youtube_transcript_api import YouTubeTranscriptApi
+      from youtube_transcript_api._errors import TranscriptsDisabled, NoTranscriptFound
       
       video_url = "{{ inputs.video_url }}"
       
@@ -42,21 +46,12 @@ tasks:
               break
       
       if not video_id:
-          raise Exception("Could not extract video ID from: " + video_url)
+          print("Could not extract video ID from: " + video_url)
+          with open('transcript.txt', 'w', encoding='utf-8') as f:
+              f.write("Error: Could not extract video ID")
+          exit(0)
       
       print("Video ID: " + video_id)
-      print("::output video_id::" + video_id)
-
-  - id: extract_transcript
-    type: io.kestra.plugin.scripts.python.Script
-    beforeCommands:
-      - pip install youtube-transcript-api > /dev/null 2>&1
-    script: |
-      from youtube_transcript_api import YouTubeTranscriptApi
-      from youtube_transcript_api._errors import TranscriptsDisabled, NoTranscriptFound
-      import json
-      
-      video_id = "{{ outputs.extract_video_id.vars.video_id }}"
       
       try:
           transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
@@ -84,24 +79,24 @@ tasks:
           
           full_text = ' '.join([segment['text'] for segment in transcript])
           full_text = full_text.replace('\n', ' ').replace('  ', ' ').strip()
-          full_text = full_text.replace('"', "'")
           
           print("Transcript length: " + str(len(full_text)) + " characters")
           
           with open('transcript.txt', 'w', encoding='utf-8') as f:
               f.write(full_text)
           
-          print("::output transcript::" + full_text[:30000])
-          
       except TranscriptsDisabled:
           print("Transcripts are disabled for this video")
-          print("::output transcript::Transcripts disabled")
+          with open('transcript.txt', 'w', encoding='utf-8') as f:
+              f.write("Transcripts disabled for this video")
       except NoTranscriptFound:
           print("No transcript found for this video")
-          print("::output transcript::No transcript found")
+          with open('transcript.txt', 'w', encoding='utf-8') as f:
+              f.write("No transcript found")
       except Exception as e:
           print("Error fetching transcript: " + str(e))
-          print("::output transcript::Error fetching transcript")
+          with open('transcript.txt', 'w', encoding='utf-8') as f:
+              f.write("Error fetching transcript: " + str(e))
     outputFiles:
       - transcript.txt
 
@@ -126,7 +121,7 @@ tasks:
       except:
           transcript = "No transcript available"
       
-      if len(transcript) < 50 or transcript.startswith("Error") or transcript.startswith("No transcript"):
+      if len(transcript) < 50 or transcript.startswith("Error") or transcript.startswith("No transcript") or transcript.startswith("Transcripts disabled"):
           summary = "Summary not available - transcript could not be fetched"
           print("Skipping summary generation - no valid transcript")
       else:
@@ -141,8 +136,11 @@ tasks:
           prompt = "\n".join(prompt_lines)
           
           response = model.generate_content(prompt)
-          summary = response.text.strip()
-          summary = summary.replace('"', "'")[:500]
+          summary = response.text.strip()[:500]
       
       print("Summary: " + summary)
-      print("::output summary::" + summary)
+      
+      with open('summary.txt', 'w', encoding='utf-8') as f:
+          f.write(summary)
+    outputFiles:
+      - summary.txt
