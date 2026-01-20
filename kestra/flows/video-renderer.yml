@@ -335,7 +335,7 @@ tasks:
       print("Script length: " + str(len(script)) + " characters")
       
       response = requests.post(
-          base_url + "/v1/audio/speech",
+          base_url + "/api/v1/audio/speech",
           headers=headers,
           json=payload,
           timeout=600
