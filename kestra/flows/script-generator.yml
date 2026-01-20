@@ -24,7 +24,7 @@ inputs:
 outputs:
   - id: script
     type: STRING
-    value: "{{ outputs.merge_chapters.vars.final_script }}"
+    value: "{{ read(outputs.merge_chapters.outputFiles['final_script.txt']) | default('') }}"
 
 tasks:
   - id: get_character_names
@@ -61,8 +61,7 @@ tasks:
       with open('selected_names.json', 'w') as f:
           json.dump(selected, f)
       
-      for key, value in selected.items():
-          print("::output " + key + "::" + value)
+      print("Selected names: " + str(selected))
     outputFiles:
       - selected_names.json
 
@@ -116,9 +115,7 @@ tasks:
       with open('lang_config.json', 'w') as f:
           json.dump(config, f)
       
-      for key, value in config.items():
-          escaped = value.replace('\n', ' ')
-          print("::output " + key + "::" + escaped)
+      print("Language config: " + language_code)
     outputFiles:
       - lang_config.json
 
@@ -130,6 +127,7 @@ tasks:
       GOOGLE_API_KEY: "{{ kv('GOOGLE_API_KEY') }}"
     inputFiles:
       lang_config.json: "{{ outputs.get_language_config.outputFiles['lang_config.json'] }}"
+      transcript.txt: "{{ inputs.transcript }}"
     script: |
       import google.generativeai as genai
       import os
@@ -139,7 +137,11 @@ tasks:
       genai.configure(api_key=os.environ['GOOGLE_API_KEY'])
       model = genai.GenerativeModel('gemini-2.0-flash')
       
-      transcript = """{{ inputs.transcript }}"""[:15000]
+      try:
+          with open('transcript.txt', 'r', encoding='utf-8') as f:
+              transcript = f.read()[:15000]
+      except:
+          transcript = "{{ inputs.transcript }}"[:15000]
       
       with open('lang_config.json', 'r') as f:
           lang_config = json.load(f)
@@ -291,8 +293,6 @@ tasks:
       chapter_2.txt: "{{ outputs.generate_chapters.outputs.write_chapter[1].outputFiles['chapter_2.txt'] }}"
       chapter_3.txt: "{{ outputs.generate_chapters.outputs.write_chapter[2].outputFiles['chapter_3.txt'] }}"
     script: |
-      import base64
-      
       chapters = []
       
       for i in range(1, 4):
@@ -306,9 +306,5 @@ tasks:
           f.write(final_script)
       
       print("Final script: " + str(len(final_script)) + " characters")
-      
-      encoded = base64.b64encode(final_script.encode()).decode()
-      print("::output final_script::" + final_script[:30000])
-      print("::output script_b64::" + encoded)
     outputFiles:
       - final_script.txt
