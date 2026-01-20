@@ -3,7 +3,7 @@ namespace: company.team
 description: |
   Generates a video script based on the transcript.
   Adapts the story to the target language using Gemini.
-  Creates a 3-chapter story structure following the original workflow's approach.
+  Creates a 3-chapter story structure.
 
 labels:
   project: faceless-video-generator
@@ -24,7 +24,7 @@ inputs:
 outputs:
   - id: script
     type: STRING
-    value: "{{ read(outputs.merge_chapters.outputFiles['final_script.txt']) | default('') }}"
+    value: "{{ read(outputs.generate_full_script.outputFiles['final_script.txt']) | default('') }}"
 
 tasks:
   - id: get_character_names
@@ -119,36 +119,37 @@ tasks:
     outputFiles:
       - lang_config.json
 
-  - id: create_story_structure
+  - id: generate_full_script
     type: io.kestra.plugin.scripts.python.Script
     beforeCommands:
       - pip install google-generativeai > /dev/null 2>&1
     env:
       GOOGLE_API_KEY: "{{ kv('GOOGLE_API_KEY') }}"
     inputFiles:
+      names.json: "{{ outputs.select_random_names.outputFiles['selected_names.json'] }}"
       lang_config.json: "{{ outputs.get_language_config.outputFiles['lang_config.json'] }}"
-      transcript.txt: "{{ inputs.transcript }}"
     script: |
       import google.generativeai as genai
       import os
       import json
-      import re
+      import time
       
       genai.configure(api_key=os.environ['GOOGLE_API_KEY'])
       model = genai.GenerativeModel('gemini-3-flash-preview')
       
-      try:
-          with open('transcript.txt', 'r', encoding='utf-8') as f:
-              transcript = f.read()[:15000]
-      except:
-          transcript = "{{ inputs.transcript }}"[:15000]
+      transcript = """{{ inputs.transcript }}"""[:15000]
       
-      with open('lang_config.json', 'r') as f:
+      with open('names.json', 'r', encoding='utf-8') as f:
+          names = json.load(f)
+      
+      with open('lang_config.json', 'r', encoding='utf-8') as f:
           lang_config = json.load(f)
       
       language_name = lang_config['name']
       
-      prompt_lines = [
+      # Step 1: Create story structure
+      print("Creating story structure...")
+      structure_prompt_lines = [
           "Analyze this video transcript and create a 3-chapter story structure following the three-act structure.",
           "",
           "CRITICAL: The story MUST begin in medias res - Chapter 1 starts directly within the main confrontation/action.",
@@ -164,98 +165,62 @@ tasks:
           "The hook (first 5-10 sentences) is CRUCIAL - these key moments must be preserved.",
           "",
           "Output as JSON with this exact format:",
-          '{"story_overview": "Brief 2-3 sentence overview", "chapters": [{"number": 1, "title": "Chapter title", "key_events": ["event1", "event2"], "emotional_arc": "Description of emotions"}, {"number": 2, "title": "...", "key_events": [], "emotional_arc": "..."}, {"number": 3, "title": "...", "key_events": [], "emotional_arc": "..."}]}'
+          '{"story_overview": "Brief overview", "chapters": [{"number": 1, "title": "Title", "key_events": ["event1"], "emotional_arc": "..."}, {"number": 2, "title": "...", "key_events": [], "emotional_arc": "..."}, {"number": 3, "title": "...", "key_events": [], "emotional_arc": "..."}]}'
       ]
-      prompt = "\n".join(prompt_lines)
       
-      response = model.generate_content(prompt)
-      text = response.text
+      response = model.generate_content("\n".join(structure_prompt_lines))
       
-      json_match = re.search(r'\{[\s\S]*\}', text)
+      import re
+      json_match = re.search(r'\{[\s\S]*\}', response.text)
       if json_match:
           structure = json.loads(json_match.group())
       else:
-          structure = {"story_overview": text, "chapters": [{"number": 1, "title": "Chapter 1", "key_events": [], "emotional_arc": ""}, {"number": 2, "title": "Chapter 2", "key_events": [], "emotional_arc": ""}, {"number": 3, "title": "Chapter 3", "key_events": [], "emotional_arc": ""}]}
-      
-      with open('story_structure.json', 'w', encoding='utf-8') as f:
-          json.dump(structure, f, ensure_ascii=False, indent=2)
+          structure = {"story_overview": "", "chapters": [{"number": 1, "title": "Chapter 1", "key_events": [], "emotional_arc": ""}, {"number": 2, "title": "Chapter 2", "key_events": [], "emotional_arc": ""}, {"number": 3, "title": "Chapter 3", "key_events": [], "emotional_arc": ""}]}
       
       print("Story structure created with " + str(len(structure.get('chapters', []))) + " chapters")
-    outputFiles:
-      - story_structure.json
-
-  - id: generate_chapters
-    type: io.kestra.plugin.core.flow.ForEach
-    values: ["1", "2", "3"]
-    concurrencyLimit: 1
-    tasks:
-      - id: write_chapter
-        type: io.kestra.plugin.scripts.python.Script
-        beforeCommands:
-          - pip install google-generativeai > /dev/null 2>&1
-        env:
-          GOOGLE_API_KEY: "{{ kv('GOOGLE_API_KEY') }}"
-        inputFiles:
-          structure.json: "{{ outputs.create_story_structure.outputFiles['story_structure.json'] }}"
-          names.json: "{{ outputs.select_random_names.outputFiles['selected_names.json'] }}"
-          lang_config.json: "{{ outputs.get_language_config.outputFiles['lang_config.json'] }}"
-        script: |
-          import google.generativeai as genai
-          import os
-          import json
-          
-          genai.configure(api_key=os.environ['GOOGLE_API_KEY'])
-          model = genai.GenerativeModel('gemini-3-flash-preview')
-          
-          chapter_num = int("{{ taskrun.value }}")
-          
-          with open('structure.json', 'r', encoding='utf-8') as f:
-              structure = json.load(f)
-          
-          with open('names.json', 'r', encoding='utf-8') as f:
-              names = json.load(f)
-          
-          with open('lang_config.json', 'r', encoding='utf-8') as f:
-              lang_config = json.load(f)
+      
+      # System prompt for all chapters
+      system_lines = [
+          lang_config['system_prompt_prefix'],
+          "",
+          "You are the MAIN CHARACTER of this story. Write from your perspective in FIRST PERSON.",
+          "The narration must feel like events are happening RIGHT NOW.",
+          "",
+          "NARRATIVE STYLE:",
+          "- Always use first person singular (I, me, my)",
+          "- Draw the reader directly into the action",
+          "- Use rhetorical questions that come to mind",
+          "- Show emotions directly",
+          "- Write conversationally but not vulgarly",
+          "",
+          "FORMAT RULES:",
+          "- FIRST SENTENCE RULE: Always start with direct speech, a sudden action, or a strong thought",
+          '- NEVER start with: "So, I was sitting...", "I remember..."',
+          "- Pure narrative text only. NO chapter headings.",
+          '- Write numbers as words',
+          "",
+          lang_config['chapter_prompt'],
+          "",
+          "CHARACTER NAMES:",
+          "- Older woman: " + names['protagonist_female_old'],
+          "- Younger woman: " + names['protagonist_female_young'],
+          "- Younger man: " + names['protagonist_male_young'],
+          "- Older man: " + names['protagonist_male_old']
+      ]
+      system_prompt = "\n".join(system_lines)
+      
+      # Generate all 3 chapters
+      chapters = []
+      for chapter_num in range(1, 4):
+          print("Generating chapter " + str(chapter_num) + "...")
           
           chapter_info = structure['chapters'][chapter_num - 1] if len(structure['chapters']) >= chapter_num else {}
-          
-          system_lines = [
-              lang_config['system_prompt_prefix'],
-              "",
-              "You are the MAIN CHARACTER of this story. Write from your perspective in FIRST PERSON.",
-              "The narration must feel like events are happening RIGHT NOW. The reader should feel like they are inside your head.",
-              "",
-              "NARRATIVE STYLE:",
-              "- Always use first person singular (I, me, my)",
-              "- Draw the reader directly into the action",
-              "- Use rhetorical questions that come to mind",
-              "- Show emotions directly, do not just report them",
-              "- Write conversationally but not vulgarly",
-              "",
-              "FORMAT RULES:",
-              "- FIRST SENTENCE RULE: Always start with direct speech, a sudden action, or a strong immediate thought",
-              '- NEVER start with: "So, I was sitting...", "I remember...", "It was one evening..."',
-              "- Pure narrative text only. NO chapter headings.",
-              '- Write numbers as words (e.g., "seven" not "7")',
-              "",
-              lang_config['chapter_prompt'],
-              "",
-              "CHARACTER NAMES TO USE:",
-              "- Older woman (mother/grandmother): " + names['protagonist_female_old'],
-              "- Younger woman (daughter/daughter-in-law): " + names['protagonist_female_young'],
-              "- Younger man (son/son-in-law): " + names['protagonist_male_young'],
-              "- Older man (father/grandfather): " + names['protagonist_male_old'],
-              "",
-              "QUALITY: The reader must not feel like a story is being told TO them. They must feel like they are LIVING the story."
-          ]
-          system_prompt = "\n".join(system_lines)
           
           user_lines = [
               "Story Structure:",
               json.dumps(structure, ensure_ascii=False, indent=2),
               "",
-              "Write Chapter " + str(chapter_num) + ". Target length: approximately 7,000 characters.",
+              "Write Chapter " + str(chapter_num) + ". Target: ~7000 characters.",
               str(chapter_info.get('key_events', []))
           ]
           
@@ -265,11 +230,10 @@ tasks:
               user_lines.append(lang_config['engagement_prompt'])
           
           user_lines.append("")
-          user_lines.append("Write ONLY the chapter text, no titles or headers.")
-          user_prompt = "\n".join(user_lines)
+          user_lines.append("Write ONLY the chapter text, no titles.")
           
           response = model.generate_content(
-              [system_prompt, user_prompt],
+              [system_prompt, "\n".join(user_lines)],
               generation_config=genai.GenerationConfig(
                   temperature=0.8,
                   max_output_tokens=4000
@@ -277,29 +241,14 @@ tasks:
           )
           
           chapter_text = response.text.strip()
+          chapters.append(chapter_text)
+          print("Chapter " + str(chapter_num) + ": " + str(len(chapter_text)) + " chars")
           
-          filename = 'chapter_' + str(chapter_num) + '.txt'
-          with open(filename, 'w', encoding='utf-8') as f:
-              f.write(chapter_text)
-          
-          print("Chapter " + str(chapter_num) + " written: " + str(len(chapter_text)) + " characters")
-        outputFiles:
-          - "chapter_{{ taskrun.value }}.txt"
-
-  - id: merge_chapters
-    type: io.kestra.plugin.scripts.python.Script
-    inputFiles:
-      chapter_1.txt: "{{ outputs.generate_chapters.outputs.write_chapter[0].outputFiles['chapter_1.txt'] }}"
-      chapter_2.txt: "{{ outputs.generate_chapters.outputs.write_chapter[1].outputFiles['chapter_2.txt'] }}"
-      chapter_3.txt: "{{ outputs.generate_chapters.outputs.write_chapter[2].outputFiles['chapter_3.txt'] }}"
-    script: |
-      chapters = []
+          # Small delay between chapters to avoid rate limits
+          if chapter_num < 3:
+              time.sleep(2)
       
-      for i in range(1, 4):
-          filename = 'chapter_' + str(i) + '.txt'
-          with open(filename, 'r', encoding='utf-8') as f:
-              chapters.append(f.read().strip())
-      
+      # Merge all chapters
       final_script = '\n\n'.join(chapters)
       
       with open('final_script.txt', 'w', encoding='utf-8') as f:
