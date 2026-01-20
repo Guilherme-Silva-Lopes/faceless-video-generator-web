@@ -140,7 +140,7 @@ tasks:
       # Step 2: Generate images via Replicate
       replicate_token = os.environ['REPLICATE_API_TOKEN']
       headers = {
-          'Authorization': 'Token ' + replicate_token,
+          'Authorization': 'Bearer ' + replicate_token,
           'Content-Type': 'application/json',
           'Prefer': 'wait'
       }
@@ -156,6 +156,7 @@ tasks:
                   "width": 1280,
                   "height": 720,
                   "prompt": prompt_text,
+                  "go_fast": True,
                   "output_format": "jpg",
                   "guidance_scale": 0,
                   "output_quality": 80,
