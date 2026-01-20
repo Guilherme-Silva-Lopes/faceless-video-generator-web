@@ -146,29 +146,40 @@ tasks:
           
           print("Generating image " + str(i+1) + "/6: " + prompt_id)
           
-          try:
-              output = replicate.run(
-                  "prunaai/z-image-turbo",
-                  input={
-                      "width": 1280,
-                      "height": 720,
-                      "prompt": prompt_text,
-                      "go_fast": True,
-                      "output_format": "jpg",
-                      "guidance_scale": 0,
-                      "output_quality": 80,
-                      "num_inference_steps": 8
-                  }
-              )
-              
-              # Write output to file
-              with open(prompt_id + '.jpg', 'wb') as f:
-                  f.write(output.read())
-              
-              print("  Saved: " + prompt_id + ".jpg")
-              
-          except Exception as e:
-              print("  Error: " + str(e))
+          # Retry with exponential backoff
+          max_retries = 3
+          for retry in range(max_retries):
+              try:
+                  output = replicate.run(
+                      "prunaai/z-image-turbo",
+                      input={
+                          "width": 1280,
+                          "height": 720,
+                          "prompt": prompt_text,
+                          "go_fast": True,
+                          "output_format": "jpg",
+                          "guidance_scale": 0,
+                          "output_quality": 80,
+                          "num_inference_steps": 8
+                      }
+                  )
+                  
+                  # Write output to file
+                  with open(prompt_id + '.jpg', 'wb') as f:
+                      f.write(output.read())
+                  
+                  print("  Saved: " + prompt_id + ".jpg")
+                  break  # Success, exit retry loop
+                  
+              except Exception as e:
+                  error_msg = str(e)
+                  if "429" in error_msg or "throttled" in error_msg.lower():
+                      wait_time = (retry + 1) * 10  # 10s, 20s, 30s
+                      print("  Rate limited, waiting " + str(wait_time) + "s (retry " + str(retry+1) + "/" + str(max_retries) + ")")
+                      time.sleep(wait_time)
+                  else:
+                      print("  Error: " + error_msg[:200])
+                      break  # Non-retryable error
           
           # Delay between requests
           if i < 5:
@@ -346,24 +357,37 @@ tasks:
               'lang': lang_code
           }
           
-          try:
-              response = requests.post(
-                  base_url + "/api/v1/audio/speech",
-                  headers=headers,
-                  json=payload,
-                  timeout=120
-              )
-              
-              if response.status_code == 200:
-                  filename = "part_" + str(idx).zfill(3) + ".mp3"
-                  with open(filename, 'wb') as f:
-                      f.write(response.content)
-                  audio_files.append(filename)
-                  print("  Generated: " + filename)
-              else:
-                  print("  Error: " + str(response.status_code) + " - " + response.text[:200])
-          except Exception as e:
-              print("  Exception: " + str(e))
+          # Retry with exponential backoff for TTS
+          max_retries = 3
+          for retry in range(max_retries):
+              try:
+                  timeout_val = 120 + (retry * 60)  # 120s, 180s, 240s
+                  response = requests.post(
+                      base_url + "/api/v1/audio/speech",
+                      headers=headers,
+                      json=payload,
+                      timeout=timeout_val
+                  )
+                  
+                  if response.status_code == 200:
+                      filename = "part_" + str(idx).zfill(3) + ".mp3"
+                      with open(filename, 'wb') as f:
+                          f.write(response.content)
+                      audio_files.append(filename)
+                      print("  Generated: " + filename)
+                      break  # Success
+                  else:
+                      print("  Error: " + str(response.status_code) + " - " + response.text[:100])
+                      if retry < max_retries - 1:
+                          wait_time = (retry + 1) * 15
+                          print("  Retrying in " + str(wait_time) + "s...")
+                          time.sleep(wait_time)
+              except Exception as e:
+                  print("  Exception (attempt " + str(retry+1) + "): " + str(e)[:80])
+                  if retry < max_retries - 1:
+                      wait_time = (retry + 1) * 20  # 20s, 40s
+                      print("  Retrying in " + str(wait_time) + "s...")
+                      time.sleep(wait_time)
       
       if not audio_files:
           raise Exception("No audio files generated")
