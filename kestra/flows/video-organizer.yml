@@ -8,6 +8,11 @@ labels:
   project: faceless-video-generator
   type: orchestrator
 
+# Limit to 1 concurrent execution to prevent overloading services
+concurrency:
+  limit: 1
+  behavior: QUEUE
+
 inputs:
   - id: project_id
     type: STRING
