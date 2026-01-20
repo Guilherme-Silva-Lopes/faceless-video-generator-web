@@ -26,7 +26,7 @@ inputs:
 outputs:
   - id: packaging
     type: STRING
-    value: "{{ outputs.generate_packaging.vars.packaging_json }}"
+    value: "{{ read(outputs.generate_packaging.outputFiles['packaging.json']) | default('{}') }}"
 
 tasks:
   - id: get_video_info
@@ -41,18 +41,18 @@ tasks:
       video_url = "{{ inputs.source_video_url }}"
       oembed_url = "https://www.youtube.com/oembed?url=" + video_url + "&format=json"
       
+      result = {'title': '', 'thumbnail_url': '', 'thumbnail_url_hq': ''}
+      
       try:
           response = requests.get(oembed_url, timeout=30)
           response.raise_for_status()
           data = response.json()
           
-          result = {
-              'title': data.get('title', ''),
-              'author_name': data.get('author_name', ''),
-              'thumbnail_url': data.get('thumbnail_url', '')
-          }
+          result['title'] = data.get('title', '')
+          result['author_name'] = data.get('author_name', '')
+          result['thumbnail_url'] = data.get('thumbnail_url', '')
           
-          patterns = [r'(?:v=|/v/|youtu\.be/|/embed/)([a-zA-Z0-9_-]{11})']
+          patterns = [r'(?:v=|/v/|youtu\.be/|/embed/|/shorts/)([a-zA-Z0-9_-]{11})']
           video_id = None
           for pattern in patterns:
               match = re.search(pattern, video_url)
@@ -64,91 +64,92 @@ tasks:
               result['thumbnail_url'] = "https://img.youtube.com/vi/" + video_id + "/maxresdefault.jpg"
               result['thumbnail_url_hq'] = "https://img.youtube.com/vi/" + video_id + "/hqdefault.jpg"
           
-          with open('video_info.json', 'w') as f:
-              json.dump(result, f, indent=2)
-          
           print("Video title: " + result['title'])
-          print("::output title::" + result['title'])
-          print("::output thumbnail_url::" + result['thumbnail_url'])
           
       except Exception as e:
           print("Error getting video info: " + str(e))
-          with open('video_info.json', 'w') as f:
-              json.dump({'title': '', 'thumbnail_url': ''}, f)
+      
+      with open('video_info.json', 'w') as f:
+          json.dump(result, f, indent=2)
     outputFiles:
       - video_info.json
 
-  - id: download_thumbnail
-    type: io.kestra.plugin.core.http.Download
-    uri: "{{ outputs.get_video_info.vars.thumbnail_url }}"
-    failOnEmptyResponse: false
-
-  - id: ocr_thumbnail
+  - id: download_and_ocr_thumbnail
     type: io.kestra.plugin.scripts.python.Script
     beforeCommands:
-      - pip install google-generativeai pillow > /dev/null 2>&1
+      - pip install google-generativeai pillow requests > /dev/null 2>&1
     env:
       GOOGLE_API_KEY: "{{ kv('GOOGLE_API_KEY') }}"
     inputFiles:
-      thumbnail.jpg: "{{ outputs.download_thumbnail.uri }}"
+      video_info.json: "{{ outputs.get_video_info.outputFiles['video_info.json'] }}"
     script: |
       import google.generativeai as genai
       import os
-      from pathlib import Path
+      import json
+      import requests
       
       genai.configure(api_key=os.environ['GOOGLE_API_KEY'])
       model = genai.GenerativeModel('gemini-3-flash-preview')
       
-      image_path = Path('thumbnail.jpg')
+      with open('video_info.json', 'r') as f:
+          video_info = json.load(f)
       
-      if not image_path.exists() or image_path.stat().st_size < 1000:
-          print("Thumbnail not available or too small")
-          print("::output thumbnail_text::No text found")
-          exit(0)
+      thumbnail_url = video_info.get('thumbnail_url', '')
+      thumbnail_url_hq = video_info.get('thumbnail_url_hq', '')
       
-      import PIL.Image
-      img = PIL.Image.open(image_path)
+      # Download thumbnail
+      thumbnail_path = 'thumbnail.jpg'
+      downloaded = False
       
-      prompt_lines = [
-          "OCR the text on this YouTube thumbnail image.",
-          "",
-          "Reply with ONLY the exact text you see on the thumbnail.",
-          "Keep the exact punctuation and capitalization.",
-          "If there are multiple text elements, separate them with |",
-          "If no text is visible, reply with: NO_TEXT_FOUND"
-      ]
-      prompt = "\n".join(prompt_lines)
+      for url in [thumbnail_url, thumbnail_url_hq]:
+          if url:
+              try:
+                  response = requests.get(url, timeout=30)
+                  if response.status_code == 200 and len(response.content) > 1000:
+                      with open(thumbnail_path, 'wb') as f:
+                          f.write(response.content)
+                      downloaded = True
+                      print("Downloaded thumbnail from: " + url)
+                      break
+              except:
+                  pass
       
-      try:
-          response = model.generate_content([prompt, img])
-          thumbnail_text = response.text.strip()
-          
-          if 'NO_TEXT_FOUND' in thumbnail_text:
-              thumbnail_text = ''
-          
-          print("Thumbnail text: " + thumbnail_text)
-          print("::output thumbnail_text::" + thumbnail_text)
-      except Exception as e:
-          print("OCR failed: " + str(e))
-          print("::output thumbnail_text::")
-
-  - id: get_language_labels
-    type: io.kestra.plugin.scripts.python.Script
-    script: |
-      import json
-      
-      language_code = "{{ inputs.language }}"
-      
-      labels = {
-          'pt-BR': {'language_name': 'Portuguese (Brazil)'},
-          'en-US': {'language_name': 'English (US)'},
-          'es-ES': {'language_name': 'Spanish (Spain)'},
-          'ja-JP': {'language_name': 'Japanese'},
-          'it-IT': {'language_name': 'Italian'}
+      result = {
+          'title': video_info.get('title', ''),
+          'thumbnail_text': ''
       }
       
-      config = labels.get(language_code, labels['en-US'])
-      print("::output language_name::" + config['language_name'])
+      if downloaded:
+          try:
+              import PIL.Image
+              img = PIL.Image.open(thumbnail_path)
+              
+              prompt_lines = [
+                  "OCR the text on this YouTube thumbnail image.",
+                  "",
+                  "Reply with ONLY the exact text you see on the thumbnail.",
+                  "Keep the exact punctuation and capitalization.",
+                  "If there are multiple text elements, separate them with |",
+                  "If no text is visible, reply with: NO_TEXT_FOUND"
+              ]
+              
+              response = model.generate_content(["\n".join(prompt_lines), img])
+              thumbnail_text = response.text.strip()
+              
+              if 'NO_TEXT_FOUND' not in thumbnail_text:
+                  result['thumbnail_text'] = thumbnail_text
+                  print("Thumbnail text: " + thumbnail_text)
+              else:
+                  print("No text found on thumbnail")
+          except Exception as e:
+              print("OCR failed: " + str(e))
+      else:
+          print("Could not download thumbnail")
+      
+      with open('ocr_result.json', 'w') as f:
+          json.dump(result, f, indent=2)
+    outputFiles:
+      - ocr_result.json
 
   - id: generate_packaging
     type: io.kestra.plugin.scripts.python.Script
@@ -156,6 +157,8 @@ tasks:
       - pip install google-generativeai > /dev/null 2>&1
     env:
       GOOGLE_API_KEY: "{{ kv('GOOGLE_API_KEY') }}"
+    inputFiles:
+      ocr_result.json: "{{ outputs.download_and_ocr_thumbnail.outputFiles['ocr_result.json'] }}"
     script: |
       import google.generativeai as genai
       import os
@@ -165,11 +168,22 @@ tasks:
       genai.configure(api_key=os.environ['GOOGLE_API_KEY'])
       model = genai.GenerativeModel('gemini-3-flash-preview')
       
-      original_title = """{{ outputs.get_video_info.vars.title }}"""
-      thumbnail_text = """{{ outputs.ocr_thumbnail.vars.thumbnail_text }}"""
+      with open('ocr_result.json', 'r') as f:
+          ocr_data = json.load(f)
+      
+      original_title = ocr_data.get('title', '')
+      thumbnail_text = ocr_data.get('thumbnail_text', '')
       script = """{{ inputs.script }}"""[:5000]
-      language_name = "{{ outputs.get_language_labels.vars.language_name }}"
       language_code = "{{ inputs.language }}"
+      
+      language_names = {
+          'pt-BR': 'Portuguese (Brazil)',
+          'en-US': 'English (US)',
+          'es-ES': 'Spanish (Spain)',
+          'ja-JP': 'Japanese',
+          'it-IT': 'Italian'
+      }
+      language_name = language_names.get(language_code, 'English (US)')
       
       prompt_lines = [
           "Generate YouTube video packaging in " + language_name + ".",
@@ -196,10 +210,9 @@ tasks:
           'OUTPUT FORMAT (JSON only, no markdown):',
           '{"thumbnail_text": "your thumbnail text here", "title": "your title here"}'
       ]
-      prompt = "\n".join(prompt_lines)
       
       response = model.generate_content(
-          prompt,
+          "\n".join(prompt_lines),
           generation_config=genai.GenerationConfig(
               temperature=0.7,
               response_mime_type="application/json"
@@ -223,8 +236,10 @@ tasks:
       if 'title' not in packaging:
           packaging['title'] = ''
       
-      packaging_json = json.dumps(packaging, ensure_ascii=False)
-      
       print("Title: " + packaging['title'])
       print("Thumbnail: " + packaging['thumbnail_text'])
-      print("::output packaging_json::" + packaging_json)
+      
+      with open('packaging.json', 'w', encoding='utf-8') as f:
+          json.dump(packaging, f, ensure_ascii=False, indent=2)
+    outputFiles:
+      - packaging.json
