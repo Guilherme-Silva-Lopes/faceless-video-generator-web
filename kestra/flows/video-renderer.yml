@@ -73,13 +73,13 @@ tasks:
   - id: generate_all_images
     type: io.kestra.plugin.scripts.python.Script
     beforeCommands:
-      - pip install google-generativeai replicate > /dev/null 2>&1
+      - pip install google-generativeai requests > /dev/null 2>&1
     env:
       GOOGLE_API_KEY: "{{ kv('GOOGLE_API_KEY') }}"
       REPLICATE_API_TOKEN: "{{ kv('REPLICATE_API_TOKEN') }}"
     script: |
       import google.generativeai as genai
-      import replicate
+      import requests
       import os
       import json
       import re
@@ -137,8 +137,15 @@ tasks:
       scene_prompts = prompts.get('scene_prompts', [])
       print("Generated " + str(len(scene_prompts)) + " prompts")
       
-      # Step 2: Generate images via Replicate (using official library)
-      print("Token configured: " + os.environ['REPLICATE_API_TOKEN'][:10] + "...")
+      # Step 2: Generate images via Replicate (raw HTTP like n8n)
+      replicate_token = os.environ['REPLICATE_API_TOKEN']
+      print("Token configured: " + replicate_token[:10] + "...")
+      
+      headers = {
+          'Authorization': 'Bearer ' + replicate_token,
+          'Content-Type': 'application/json',
+          'Prefer': 'wait'
+      }
       
       for i, prompt_data in enumerate(scene_prompts[:6]):
           prompt_id = prompt_data.get('prompt_id', 'scene_' + str(i+1).zfill(2))
@@ -146,44 +153,70 @@ tasks:
           
           print("Generating image " + str(i+1) + "/6: " + prompt_id)
           
+          payload = {
+              "input": {
+                  "width": 1280,
+                  "height": 720,
+                  "prompt": prompt_text,
+                  "go_fast": True,
+                  "output_format": "jpg",
+                  "guidance_scale": 0,
+                  "output_quality": 80,
+                  "num_inference_steps": 8
+              }
+          }
+          
           # Retry with exponential backoff
           max_retries = 3
           for retry in range(max_retries):
               try:
-                  output = replicate.run(
-                      "prunaai/z-image-turbo",
-                      input={
-                          "width": 1280,
-                          "height": 720,
-                          "prompt": prompt_text,
-                          "go_fast": True,
-                          "output_format": "jpg",
-                          "guidance_scale": 0,
-                          "output_quality": 80,
-                          "num_inference_steps": 8
-                      }
+                  response = requests.post(
+                      'https://api.replicate.com/v1/models/prunaai/z-image-turbo/predictions',
+                      headers=headers,
+                      json=payload,
+                      timeout=60
                   )
                   
-                  # Write output to file
-                  with open(prompt_id + '.jpg', 'wb') as f:
-                      f.write(output.read())
+                  print("  Response status: " + str(response.status_code))
                   
-                  print("  Saved: " + prompt_id + ".jpg")
-                  break  # Success, exit retry loop
-                  
-              except Exception as e:
-                  error_msg = str(e)
-                  if "429" in error_msg or "throttled" in error_msg.lower():
-                      wait_time = (retry + 1) * 10  # 10s, 20s, 30s
+                  if response.status_code in [200, 201]:
+                      result = response.json()
+                      print("  Prediction status: " + result.get('status', 'unknown'))
+                      
+                      # With Prefer: wait, response should already have output
+                      if result.get('status') == 'succeeded' and result.get('output'):
+                          output_url = result['output']
+                          if isinstance(output_url, list):
+                              output_url = output_url[0]
+                          
+                          print("  Downloading from: " + output_url[:50] + "...")
+                          img_response = requests.get(output_url, timeout=30)
+                          
+                          if img_response.status_code == 200:
+                              with open(prompt_id + '.jpg', 'wb') as f:
+                                  f.write(img_response.content)
+                              print("  Saved: " + prompt_id + ".jpg (" + str(len(img_response.content)) + " bytes)")
+                              break  # Success
+                          else:
+                              print("  Failed to download image: " + str(img_response.status_code))
+                      else:
+                          print("  No output in response: " + str(result)[:200])
+                  elif response.status_code == 429:
+                      wait_time = (retry + 1) * 15
                       print("  Rate limited, waiting " + str(wait_time) + "s (retry " + str(retry+1) + "/" + str(max_retries) + ")")
                       time.sleep(wait_time)
                   else:
-                      print("  Error: " + error_msg[:200])
-                      break  # Non-retryable error
+                      print("  API error: " + str(response.status_code) + " - " + response.text[:200])
+                      break  # Non-retryable
+                      
+              except Exception as e:
+                  print("  Exception: " + str(e)[:150])
+                  if retry < max_retries - 1:
+                      time.sleep(10)
           
           # Delay between requests
           if i < 5:
-              time.sleep(3)
+              time.sleep(5)
       
       print("Image generation complete")
     outputFiles:
