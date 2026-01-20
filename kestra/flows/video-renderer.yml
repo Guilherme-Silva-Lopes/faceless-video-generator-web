@@ -181,15 +181,38 @@ tasks:
                   
                   if response.status_code in [200, 201]:
                       result = response.json()
-                      print("  Prediction status: " + result.get('status', 'unknown'))
+                      prediction_id = result.get('id')
+                      print("  Prediction ID: " + str(prediction_id) + ", status: " + result.get('status', 'unknown'))
                       
-                      # With Prefer: wait, response should already have output
+                      # If status is not succeeded, poll for completion
+                      if result.get('status') not in ['succeeded', 'failed', 'canceled']:
+                          print("  Polling for completion...")
+                          poll_url = "https://api.replicate.com/v1/predictions/" + prediction_id
+                          poll_headers = {'Authorization': 'Bearer ' + replicate_token}
+                          
+                          for poll_attempt in range(30):  # Max 60 seconds
+                              time.sleep(2)
+                              poll_response = requests.get(poll_url, headers=poll_headers, timeout=10)
+                              if poll_response.status_code == 200:
+                                  result = poll_response.json()
+                                  status = result.get('status', 'unknown')
+                                  if status == 'succeeded':
+                                      print("  Poll: succeeded")
+                                      break
+                                  elif status in ['failed', 'canceled']:
+                                      print("  Poll: " + status)
+                                      break
+                                  else:
+                                      if poll_attempt % 5 == 0:
+                                          print("  Poll " + str(poll_attempt+1) + ": " + status)
+                      
+                      # Now check if succeeded
                       if result.get('status') == 'succeeded' and result.get('output'):
                           output_url = result['output']
                           if isinstance(output_url, list):
                               output_url = output_url[0]
                           
-                          print("  Downloading from: " + output_url[:50] + "...")
+                          print("  Downloading from: " + output_url[:60] + "...")
                           img_response = requests.get(output_url, timeout=30)
                           
                           if img_response.status_code == 200:
@@ -198,16 +221,16 @@ tasks:
                               print("  Saved: " + prompt_id + ".jpg (" + str(len(img_response.content)) + " bytes)")
                               break  # Success
                           else:
-                              print("  Failed to download image: " + str(img_response.status_code))
+                              print("  Failed to download: " + str(img_response.status_code))
                       else:
-                          print("  No output in response: " + str(result)[:200])
+                          print("  Failed: status=" + result.get('status', 'unknown') + ", error=" + str(result.get('error', ''))[:100])
                   elif response.status_code == 429:
                       wait_time = (retry + 1) * 15
                       print("  Rate limited, waiting " + str(wait_time) + "s (retry " + str(retry+1) + "/" + str(max_retries) + ")")
                       time.sleep(wait_time)
                   else:
                       print("  API error: " + str(response.status_code) + " - " + response.text[:200])
-                      break  # Non-retryable
+                      break
                       
               except Exception as e:
                   print("  Exception: " + str(e)[:150])
@@ -216,7 +239,7 @@ tasks:
           
           # Delay between requests
           if i < 5:
-              time.sleep(5)
+              time.sleep(3)
       
       print("Image generation complete")
     outputFiles:
