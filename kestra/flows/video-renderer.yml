@@ -311,27 +311,40 @@ tasks:
       with open('voice_config.json', 'r') as f:
           voice_config = json.load(f)
       
-      voice_id = voice_config['voice_id']
-      speed = voice_config['speed']
+      language = "{{ inputs.language }}"
+      speed = voice_config.get('speed', 1.0)
+      
+      # Map language to Kokoro voice and lang code
+      voice_map = {
+          'pt-BR': {'voice': 'pf_dora', 'lang': 'p'},
+          'en-US': {'voice': 'af_heart', 'lang': 'a'},
+          'es-ES': {'voice': 'ef_dora', 'lang': 'e'},
+          'ja-JP': {'voice': 'jf_alpha', 'lang': 'j'},
+          'it-IT': {'voice': 'if_sara', 'lang': 'i'}
+      }
+      
+      voice_config_lang = voice_map.get(language, voice_map['en-US'])
+      voice_id = voice_config_lang['voice']
+      lang_code = voice_config_lang['lang']
       
       script = """{{ inputs.script }}"""
       script = script.replace('\n\n', ' ').replace('\n', ' ')
       script = ' '.join(script.split())
       
-      headers = {
-          'Authorization': 'Bearer ' + api_key,
-          'Content-Type': 'application/json'
-      }
+      headers = {'Content-Type': 'application/json'}
+      if api_key and api_key.strip() and api_key != 'null':
+          headers['Authorization'] = api_key
       
       payload = {
-          'model': 'kokoro',
+          'model': 'model_q4',
           'input': script,
           'voice': voice_id,
           'speed': speed,
-          'response_format': 'mp3'
+          'response_format': 'mp3',
+          'lang': lang_code
       }
       
-      print("Generating voiceover with voice: " + voice_id)
+      print("Generating voiceover with voice: " + voice_id + " (lang: " + lang_code + ")")
       print("Script length: " + str(len(script)) + " characters")
       
       response = requests.post(
