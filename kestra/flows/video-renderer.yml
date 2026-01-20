@@ -139,6 +139,8 @@ tasks:
       
       # Step 2: Generate images via Replicate
       replicate_token = os.environ['REPLICATE_API_TOKEN']
+      print("Token prefix: " + replicate_token[:10] + "...")
+      
       headers = {
           'Authorization': 'Bearer ' + replicate_token,
           'Content-Type': 'application/json',
@@ -149,7 +151,7 @@ tasks:
           prompt_id = prompt_data.get('prompt_id', 'scene_' + str(i+1).zfill(2))
           prompt_text = prompt_data.get('prompt_text', '')
           
-          print("Generating image: " + prompt_id)
+          print("Generating image " + str(i+1) + "/6: " + prompt_id)
           
           payload = {
               "input": {
@@ -172,39 +174,56 @@ tasks:
                   timeout=120
               )
               
-              if response.status_code == 201:
+              # With Prefer: wait, API returns 200 when completed, 201 when still processing
+              if response.status_code in [200, 201]:
                   result = response.json()
-                  prediction_id = result['id']
                   
-                  # Poll for completion
-                  max_attempts = 30
-                  while result['status'] not in ['succeeded', 'failed', 'canceled'] and max_attempts > 0:
-                      time.sleep(2)
-                      poll = requests.get(
-                          "https://api.replicate.com/v1/predictions/" + prediction_id,
-                          headers={'Authorization': headers['Authorization']}
-                      )
-                      result = poll.json()
-                      max_attempts -= 1
-                  
-                  if result['status'] == 'succeeded':
-                      output_url = result['output']
+                  # Check if already completed (Prefer: wait)
+                  if result.get('status') == 'succeeded':
+                      output_url = result.get('output')
                       if isinstance(output_url, list):
                           output_url = output_url[0]
                       
-                      img_response = requests.get(output_url)
-                      with open(prompt_id + '.jpg', 'wb') as f:
-                          f.write(img_response.content)
-                      print("Saved: " + prompt_id + ".jpg")
+                      if output_url:
+                          img_response = requests.get(output_url)
+                          with open(prompt_id + '.jpg', 'wb') as f:
+                              f.write(img_response.content)
+                          print("  Saved: " + prompt_id + ".jpg (" + str(len(img_response.content)) + " bytes)")
+                      else:
+                          print("  No output URL in response")
                   else:
-                      print("Failed to generate: " + prompt_id)
+                      # Need to poll
+                      prediction_id = result['id']
+                      max_attempts = 30
+                      while result['status'] not in ['succeeded', 'failed', 'canceled'] and max_attempts > 0:
+                          time.sleep(2)
+                          poll = requests.get(
+                              "https://api.replicate.com/v1/predictions/" + prediction_id,
+                              headers={'Authorization': headers['Authorization']}
+                          )
+                          result = poll.json()
+                          max_attempts -= 1
+                      
+                      if result['status'] == 'succeeded':
+                          output_url = result['output']
+                          if isinstance(output_url, list):
+                              output_url = output_url[0]
+                          
+                          img_response = requests.get(output_url)
+                          with open(prompt_id + '.jpg', 'wb') as f:
+                              f.write(img_response.content)
+                          print("  Saved: " + prompt_id + ".jpg")
+                      else:
+                          print("  Failed: " + result.get('status', 'unknown') + " - " + str(result.get('error', '')))
               else:
-                  print("API error for " + prompt_id + ": " + str(response.status_code))
+                  print("  API error " + str(response.status_code) + ": " + response.text[:300])
           except Exception as e:
-              print("Error generating " + prompt_id + ": " + str(e))
+              print("  Exception: " + str(e))
           
-          # Rate limit delay
-          time.sleep(1)
+          # Longer delay between requests to avoid rate limits
+          if i < 5:
+              print("  Waiting 5s before next request...")
+              time.sleep(5)
       
       print("Image generation complete")
     outputFiles:
