@@ -73,16 +73,16 @@ tasks:
   - id: generate_all_images
     type: io.kestra.plugin.scripts.python.Script
     beforeCommands:
-      - pip install google-generativeai requests > /dev/null 2>&1
+      - pip install google-generativeai replicate > /dev/null 2>&1
     env:
       GOOGLE_API_KEY: "{{ kv('GOOGLE_API_KEY') }}"
       REPLICATE_API_TOKEN: "{{ kv('REPLICATE_API_TOKEN') }}"
     script: |
       import google.generativeai as genai
+      import replicate
       import os
       import json
       import re
-      import requests
       import time
       
       genai.configure(api_key=os.environ['GOOGLE_API_KEY'])
@@ -137,15 +137,8 @@ tasks:
       scene_prompts = prompts.get('scene_prompts', [])
       print("Generated " + str(len(scene_prompts)) + " prompts")
       
-      # Step 2: Generate images via Replicate
-      replicate_token = os.environ['REPLICATE_API_TOKEN']
-      print("Token prefix: " + replicate_token[:10] + "...")
-      
-      headers = {
-          'Authorization': 'Bearer ' + replicate_token,
-          'Content-Type': 'application/json',
-          'Prefer': 'wait'
-      }
+      # Step 2: Generate images via Replicate (using official library)
+      print("Token configured: " + os.environ['REPLICATE_API_TOKEN'][:10] + "...")
       
       for i, prompt_data in enumerate(scene_prompts[:6]):
           prompt_id = prompt_data.get('prompt_id', 'scene_' + str(i+1).zfill(2))
@@ -153,77 +146,33 @@ tasks:
           
           print("Generating image " + str(i+1) + "/6: " + prompt_id)
           
-          payload = {
-              "input": {
-                  "width": 1280,
-                  "height": 720,
-                  "prompt": prompt_text,
-                  "go_fast": True,
-                  "output_format": "jpg",
-                  "guidance_scale": 0,
-                  "output_quality": 80,
-                  "num_inference_steps": 8
-              }
-          }
-          
           try:
-              response = requests.post(
-                  'https://api.replicate.com/v1/models/prunaai/z-image-turbo/predictions',
-                  headers=headers,
-                  json=payload,
-                  timeout=120
+              output = replicate.run(
+                  "prunaai/z-image-turbo",
+                  input={
+                      "width": 1280,
+                      "height": 720,
+                      "prompt": prompt_text,
+                      "go_fast": True,
+                      "output_format": "jpg",
+                      "guidance_scale": 0,
+                      "output_quality": 80,
+                      "num_inference_steps": 8
+                  }
               )
               
-              # With Prefer: wait, API returns 200 when completed, 201 when still processing
-              if response.status_code in [200, 201]:
-                  result = response.json()
-                  
-                  # Check if already completed (Prefer: wait)
-                  if result.get('status') == 'succeeded':
-                      output_url = result.get('output')
-                      if isinstance(output_url, list):
-                          output_url = output_url[0]
-                      
-                      if output_url:
-                          img_response = requests.get(output_url)
-                          with open(prompt_id + '.jpg', 'wb') as f:
-                              f.write(img_response.content)
-                          print("  Saved: " + prompt_id + ".jpg (" + str(len(img_response.content)) + " bytes)")
-                      else:
-                          print("  No output URL in response")
-                  else:
-                      # Need to poll
-                      prediction_id = result['id']
-                      max_attempts = 30
-                      while result['status'] not in ['succeeded', 'failed', 'canceled'] and max_attempts > 0:
-                          time.sleep(2)
-                          poll = requests.get(
-                              "https://api.replicate.com/v1/predictions/" + prediction_id,
-                              headers={'Authorization': headers['Authorization']}
-                          )
-                          result = poll.json()
-                          max_attempts -= 1
-                      
-                      if result['status'] == 'succeeded':
-                          output_url = result['output']
-                          if isinstance(output_url, list):
-                              output_url = output_url[0]
-                          
-                          img_response = requests.get(output_url)
-                          with open(prompt_id + '.jpg', 'wb') as f:
-                              f.write(img_response.content)
-                          print("  Saved: " + prompt_id + ".jpg")
-                      else:
-                          print("  Failed: " + result.get('status', 'unknown') + " - " + str(result.get('error', '')))
-              else:
-                  print("  API error " + str(response.status_code) + ": " + response.text[:300])
+              # Write output to file
+              with open(prompt_id + '.jpg', 'wb') as f:
+                  f.write(output.read())
+              
+              print("  Saved: " + prompt_id + ".jpg")
+              
           except Exception as e:
-              print("  Exception: " + str(e))
+              print("  Error: " + str(e))
           
-          # Longer delay between requests to avoid rate limits
+          # Delay between requests
           if i < 5:
-              print("  Waiting 5s before next request...")
-              time.sleep(5)
+              time.sleep(3)
       
       print("Image generation complete")
     outputFiles:
