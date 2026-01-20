@@ -261,28 +261,13 @@ tasks:
     outputFiles:
       - created_projects.json
 
-  - id: check_projects_count
-    type: io.kestra.plugin.scripts.python.Script
-    inputFiles:
-      projects.json: "{{ outputs.create_projects.outputFiles['created_projects.json'] }}"
-    script: |
-      import json
-      
-      with open('projects.json', 'r') as f:
-          projects = json.load(f)
-      
-      count = len(projects)
-      print("Projects to process: " + str(count))
-      print("::output count::" + str(count))
-      print("::output has_projects::" + str(count > 0).lower())
-
   - id: trigger_organizer
     type: io.kestra.plugin.core.flow.If
-    condition: "{{ outputs.check_projects_count.vars.has_projects == 'true' }}"
+    condition: "{{ read(outputs.create_projects.outputFiles['created_projects.json']) | jq('length') | first > 0 }}"
     then:
       - id: process_each_project
         type: io.kestra.plugin.core.flow.ForEach
-        values: "{{ outputs.create_projects.outputFiles['created_projects.json'] | jq('.[]') }}"
+        values: "{{ read(outputs.create_projects.outputFiles['created_projects.json']) | jq('.[]') }}"
         concurrencyLimit: 1
         tasks:
           - id: start_processing
@@ -296,3 +281,4 @@ tasks:
       - id: no_projects
         type: io.kestra.plugin.core.log.Log
         message: "No new projects to process. Scraper completed successfully."
+
