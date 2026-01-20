@@ -17,14 +17,14 @@ inputs:
   - id: workflow
     type: STRING
     description: Which workflow to trigger (scraper, organizer)
-    defaults: organizer
+    defaults: scraper
   - id: project_id
     type: STRING
     required: false
     description: Project ID for organizer workflow
   - id: force_run
     type: BOOLEAN
-    defaults: false
+    defaults: true
     description: Force run for scraper
 
 tasks:
@@ -42,13 +42,21 @@ tasks:
           wait: false
       
       organizer:
-        - id: trigger_organizer
-          type: io.kestra.plugin.core.flow.Subflow
-          namespace: company.team
-          flowId: video-organizer
-          inputs:
-            project_id: "{{ inputs.project_id }}"
-          wait: false
+        - id: check_project_id
+          type: io.kestra.plugin.core.flow.If
+          condition: "{{ inputs.project_id != null and inputs.project_id != '' }}"
+          then:
+            - id: trigger_organizer
+              type: io.kestra.plugin.core.flow.Subflow
+              namespace: company.team
+              flowId: video-organizer
+              inputs:
+                project_id: "{{ inputs.project_id }}"
+              wait: false
+          else:
+            - id: missing_project_id
+              type: io.kestra.plugin.core.log.Log
+              message: "Error: project_id is required for organizer workflow"
     
     defaults:
       - id: unknown_workflow
@@ -57,4 +65,4 @@ tasks:
 
   - id: response
     type: io.kestra.plugin.core.log.Log
-    message: "Triggered workflow: {{ inputs.workflow }} - Project ID: {{ inputs.project_id | default('N/A') }}"
+    message: "Triggered workflow: {{ inputs.workflow }}"
