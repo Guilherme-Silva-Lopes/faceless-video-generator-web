@@ -225,23 +225,40 @@ async def list_voice_profiles():
 # WORKFLOW TRIGGERS
 # ============================================
 
+KESTRA_WEBHOOK_URL = os.getenv("KESTRA_WEBHOOK_URL", "")
+
 async def trigger_kestra_workflow(flow_id: str, inputs: dict):
-    """Trigger a Kestra workflow"""
+    """Trigger a Kestra workflow via webhook or direct API"""
     async with httpx.AsyncClient() as client:
-        # Use Kestra's execution API
-        url = f"{KESTRA_URL}/api/v1/executions/{KESTRA_NAMESPACE}/{flow_id}"
-        
-        response = await client.post(
-            url,
-            json=inputs,
-            headers={"Content-Type": "application/json"},
-            timeout=30.0
-        )
-        
-        if response.status_code >= 400:
-            print(f"Failed to trigger workflow {flow_id}: {response.text}")
-        else:
-            print(f"Triggered workflow {flow_id}: {response.json()}")
+        try:
+            # Try webhook first if configured
+            if KESTRA_WEBHOOK_URL:
+                url = KESTRA_WEBHOOK_URL
+                params = {"workflow": "scraper" if "scraper" in flow_id else "organizer"}
+                params.update(inputs)
+                
+                response = await client.post(
+                    url,
+                    params=params,
+                    timeout=30.0
+                )
+            else:
+                # Fallback to direct API
+                url = f"{KESTRA_URL}/api/v1/executions/{KESTRA_NAMESPACE}/{flow_id}"
+                response = await client.post(
+                    url,
+                    json=inputs,
+                    headers={"Content-Type": "application/json"},
+                    timeout=30.0
+                )
+            
+            if response.status_code >= 400:
+                print(f"Failed to trigger workflow {flow_id}: {response.status_code} - {response.text}")
+            else:
+                print(f"Triggered workflow {flow_id}: Status {response.status_code}")
+                
+        except Exception as e:
+            print(f"Error triggering workflow {flow_id}: {str(e)}")
 
 @app.post("/api/trigger/scraper")
 async def trigger_scraper(background_tasks: BackgroundTasks):
