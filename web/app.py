@@ -191,6 +191,19 @@ async def delete_project(project_id: str):
     await supabase_request("DELETE", f"projects?id=eq.{project_id}")
     return {"status": "deleted"}
 
+@app.post("/api/projects/{project_id}/generate")
+async def generate_project(project_id: str, background_tasks: BackgroundTasks):
+    """Start video generation for a queued project"""
+    # Update status to processing
+    await supabase_request("PATCH", f"projects?id=eq.{project_id}", {
+        "status": "processing"
+    })
+    
+    # Trigger workflow
+    background_tasks.add_task(trigger_kestra_workflow, "video-organizer", {"project_id": project_id})
+    
+    return {"status": "generating"}
+
 # ============================================
 # SETTINGS ENDPOINTS
 # ============================================

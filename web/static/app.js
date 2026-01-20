@@ -456,6 +456,7 @@ function renderProjectsTable(projects) {
                                 </td>
                                 <td>
                                     <div style="display: flex; gap: 0.5rem;">
+                                        ${p.status === 'queued' ? `<button class="btn btn-primary btn-sm" onclick="generateProject('${p.id}')" title="Generate Video">▶️ Generate</button>` : ''}
                                         <button class="btn btn-ghost btn-sm" onclick="showProjectDetails('${p.id}')" title="View Details">👁️</button>
                                         ${p.status === 'error' ? `<button class="btn btn-ghost btn-sm" onclick="retryProject('${p.id}')" title="Retry">🔄</button>` : ''}
                                         ${p.final_video_url ? `<a href="${p.final_video_url}" target="_blank" class="btn btn-ghost btn-sm" title="Download">📥</a>` : ''}
@@ -607,6 +608,16 @@ async function deleteProject(id) {
         loadProjects();
     } catch (error) {
         showToast('Error deleting project: ' + error.message, 'error');
+    }
+}
+
+async function generateProject(id) {
+    try {
+        await fetchAPI(`/api/projects/${id}/generate`, 'POST');
+        showToast('Video generation started!', 'success');
+        loadProjects();
+    } catch (error) {
+        showToast('Error starting generation: ' + error.message, 'error');
     }
 }
 

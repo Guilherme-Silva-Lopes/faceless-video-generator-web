@@ -261,24 +261,7 @@ tasks:
     outputFiles:
       - created_projects.json
 
-  - id: trigger_organizer
-    type: io.kestra.plugin.core.flow.If
-    condition: "{{ read(outputs.create_projects.outputFiles['created_projects.json']) | jq('length') | first > 0 }}"
-    then:
-      - id: process_each_project
-        type: io.kestra.plugin.core.flow.ForEach
-        values: "{{ read(outputs.create_projects.outputFiles['created_projects.json']) | jq('.[]') }}"
-        concurrencyLimit: 1
-        tasks:
-          - id: start_processing
-            type: io.kestra.plugin.core.flow.Subflow
-            namespace: company.team
-            flowId: video-organizer
-            inputs:
-              project_id: "{{ json(taskrun.value).id }}"
-            wait: false
-    else:
-      - id: no_projects
-        type: io.kestra.plugin.core.log.Log
-        message: "No new projects to process. Scraper completed successfully."
+  - id: scraper_complete
+    type: io.kestra.plugin.core.log.Log
+    message: "Scraper completed. {{ read(outputs.create_projects.outputFiles['created_projects.json']) | jq('length') | first }} new projects queued for manual generation."
 
