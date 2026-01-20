@@ -97,7 +97,7 @@ tasks:
       from pathlib import Path
       
       genai.configure(api_key=os.environ['GOOGLE_API_KEY'])
-      model = genai.GenerativeModel('gemini-2.0-flash')
+      model = genai.GenerativeModel('gemini-3-flash-preview')
       
       image_path = Path('thumbnail.jpg')
       
@@ -163,7 +163,7 @@ tasks:
       import re
       
       genai.configure(api_key=os.environ['GOOGLE_API_KEY'])
-      model = genai.GenerativeModel('gemini-2.0-flash')
+      model = genai.GenerativeModel('gemini-3-flash-preview')
       
       original_title = """{{ outputs.get_video_info.vars.title }}"""
       thumbnail_text = """{{ outputs.ocr_thumbnail.vars.thumbnail_text }}"""
